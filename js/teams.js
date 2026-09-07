@@ -127,6 +127,14 @@ export async function removeMember(teamId, memberUid) {
   await updateDoc(teamRef(teamId), { memberUids: arrayRemove(memberUid), updatedAt: serverTimestamp() });
 }
 
+/** Owner only (enforced by rules): set a member's role to "editor" or "member". */
+export async function setMemberRole(teamId, memberUid, role) {
+  await updateDoc(doc(db, "teams", teamId, "members", memberUid), {
+    role,
+    updatedAt: serverTimestamp(),
+  });
+}
+
 export async function deleteTeam(teamId) {
   const team = await getTeam(teamId);
   for (const sub of ["members", "battles", "events"]) {

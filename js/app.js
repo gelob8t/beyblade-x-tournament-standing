@@ -988,6 +988,19 @@ function isTeamOwner() {
   return state.team && auth.currentUser && state.team.ownerUid === auth.currentUser.uid;
 }
 
+function myMemberRow() {
+  return auth.currentUser
+    ? state.teamMembers.find((m) => m.uid === auth.currentUser.uid) || null
+    : null;
+}
+
+/** Owner, or a member the owner promoted to "editor". */
+function canManageTeam() {
+  if (isTeamOwner()) return true;
+  const me = myMemberRow();
+  return !!me && me.role === "editor";
+}
+
 function renderTeam(main) {
   if (!state.team) return renderTeamJoin(main);
 
@@ -1050,6 +1063,7 @@ function teamRoster(panel) {
       gw: Number(s.gameW || 0), gl: Number(s.gameL || 0), tn: Number(s.tournaments || 0), best: s.bestPlacement };
   }).sort((a, b) => b.rate - a.rate || b.total - a.total);
 
+  const owner = isTeamOwner();
   panel.innerHTML = `
     <div class="row-between">
       <p class="muted small">Ranked by match win rate. Records update when each member logs matches.</p>
@@ -1057,20 +1071,23 @@ function teamRoster(panel) {
     </div>
     <section class="panel">
       <table class="data-table">
-        <thead><tr><th>#</th><th>Blader</th><th>Matches</th><th>Win rate</th><th>Games</th><th>Events</th><th>Best</th>${isTeamOwner() ? "<th></th>" : ""}</tr></thead>
+        <thead><tr><th>#</th><th>Blader</th><th>Matches</th><th>Win rate</th><th>Games</th><th>Events</th><th>Best</th>${owner ? "<th>Manage</th>" : ""}</tr></thead>
         <tbody>
           ${rows.map((r, i) => `<tr>
             <td>${i + 1}</td>
-            <td>${esc(r.bladerName || "Blader")}${r.role === "owner" ? ` <span class="chip chip--accent">owner</span>` : ""}${r.uid === auth.currentUser.uid ? ` <span class="chip">you</span>` : ""}</td>
+            <td>${esc(r.bladerName || "Blader")}${r.role === "owner" ? ` <span class="chip chip--accent">owner</span>` : ""}${r.role === "editor" ? ` <span class="chip chip--accent">editor</span>` : ""}${r.uid === auth.currentUser.uid ? ` <span class="chip">you</span>` : ""}</td>
             <td>${r.mw}–${r.ml}</td>
             <td><div class="mini-bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div> ${Math.round(r.rate * 100)}%</td>
             <td>${r.gw}–${r.gl}</td>
             <td>${r.tn}</td>
             <td>${r.best ? ordinal(r.best) : "—"}</td>
-            ${isTeamOwner() ? `<td>${r.uid === state.team.ownerUid ? "" : `<button class="btn-link danger" data-kick="${r.uid}">remove</button>`}</td>` : ""}
+            ${owner ? `<td class="row-actions">${r.uid === state.team.ownerUid ? "<span class='muted'>—</span>" : `
+              <button class="btn-link" data-role="${r.uid}" data-to="${r.role === "editor" ? "member" : "editor"}">${r.role === "editor" ? "revoke editor" : "make editor"}</button>
+              <button class="btn-link danger" data-kick="${r.uid}">remove</button>`}</td>` : ""}
           </tr>`).join("")}
         </tbody>
       </table>
+      ${owner ? `<p class="muted small">Editors can change team info and regenerate the invite code. Only you can remove members or delete the team.</p>` : ""}
     </section>
   `;
   $("#sync-stats").addEventListener("click", (e) =>
@@ -1080,6 +1097,16 @@ function teamRoster(panel) {
       renderTeam($("#main"));
       toast("Your record is up to date.");
     })
+  );
+  $$("[data-role]", panel).forEach((b) =>
+    b.addEventListener("click", (e) =>
+      runBtn(e.currentTarget, "…", async () => {
+        await teams.setMemberRole(state.team.id, b.dataset.role, b.dataset.to);
+        await refreshTeam();
+        renderTeam($("#main"));
+        toast(b.dataset.to === "editor" ? "Member can now edit team info." : "Editor access removed.");
+      })
+    )
   );
   $$("[data-kick]", panel).forEach((b) =>
     b.addEventListener("click", () => confirmTeamAction(
@@ -1291,6 +1318,8 @@ function teamEventForm(existing) {
 function teamAbout(panel) {
   const t = state.team;
   const owner = isTeamOwner();
+  const manage = canManageTeam();
+  const editors = state.teamMembers.filter((m) => m.role === "editor").map((m) => m.bladerName || "Blader");
   panel.innerHTML = `
     <section class="panel">
       <h2>Team info</h2>
@@ -1300,22 +1329,26 @@ function teamAbout(panel) {
         <dt>Region</dt><dd>${esc(t.region || "—")}</dd>
         <dt>Founded</dt><dd>${esc(t.founded || "—")}</dd>
         <dt>Invite code</dt><dd><code>${esc(t.inviteCode)}</code></dd>
+        <dt>Editors</dt><dd>${editors.length ? esc(editors.join(", ")) : "<span class='muted'>none — owner only</span>"}</dd>
       </dl>
       ${t.bio ? `<p class="card-notes">${esc(t.bio)}</p>` : ""}
+      ${!manage ? `<p class="muted small">Only the owner${editors.length ? " and editors" : ""} can change team info. ${owner ? "" : "Ask the owner to make you an editor from the Roster tab."}</p>` : ""}
     </section>
     <div class="row-between">
-      ${owner ? `<button class="btn btn-ghost btn-sm" id="edit-team">Edit team</button>
-                 <button class="btn btn-ghost btn-sm" id="new-code">Regenerate invite code</button>
-                 <button class="btn btn-ghost btn-sm danger" id="del-team">Delete team</button>`
-              : `<button class="btn btn-ghost btn-sm danger" id="leave-team">Leave team</button>`}
+      ${manage ? `<button class="btn btn-ghost btn-sm" id="edit-team">Edit team</button>
+                  <button class="btn btn-ghost btn-sm" id="new-code">Regenerate invite code</button>` : ""}
+      ${owner ? `<button class="btn btn-ghost btn-sm danger" id="del-team">Delete team</button>` : ""}
+      ${!owner ? `<button class="btn btn-ghost btn-sm danger" id="leave-team">Leave team</button>` : ""}
     </div>
   `;
-  if (owner) {
+  if (manage) {
     $("#edit-team").addEventListener("click", () => teamForm(t));
     $("#new-code").addEventListener("click", () => confirmTeamAction(
       "Regenerate code", "The old invite code stops working immediately. Continue?",
       async () => { await teams.regenerateCode(t.id, t.inviteCode); await refreshTeam(); renderTeam($("#main")); toast("New invite code generated."); }
     ));
+  }
+  if (owner) {
     $("#del-team").addEventListener("click", () => confirmTeamAction(
       "Delete team", "This permanently deletes the team, its roster, battles and events for everyone. This can't be undone.",
       async () => {

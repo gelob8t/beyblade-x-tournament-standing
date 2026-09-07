@@ -28,6 +28,19 @@ service cloud.firestore {
     function isMember(teamId) {
       return signedIn() && request.auth.uid in teamData(teamId).memberUids;
     }
+    function isOwner(teamId) {
+      return signedIn() && teamData(teamId).ownerUid == request.auth.uid;
+    }
+    function myRole(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid)).data.get('role', 'member');
+    }
+    // owner, or a member the owner promoted to "editor"
+    function canManage(teamId) {
+      return isOwner(teamId)
+        || (isMember(teamId)
+            && exists(/databases/$(database)/documents/teams/$(teamId)/members/$(request.auth.uid))
+            && myRole(teamId) == 'editor');
+    }
 
     match /teams/{teamId} {
       // any signed-in user may read basic team info (needed to join by code)
@@ -42,7 +55,15 @@ service cloud.firestore {
       allow update: if signedIn() && (
         // owner can change anything
         resource.data.ownerUid == request.auth.uid
-        // a member may only add or remove THEMSELVES from the roster
+
+        // an editor can change team info but not ownership or the roster
+        || (
+          canManage(teamId)
+          && request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.memberUids == resource.data.memberUids
+        )
+
+        // any member may only add or remove THEMSELVES from the roster
         || (
           request.resource.data.ownerUid == resource.data.ownerUid
           && request.resource.data.diff(resource.data).affectedKeys()
@@ -56,8 +77,18 @@ service cloud.firestore {
 
       match /members/{memberUid} {
         allow read: if isMember(teamId);
-        // you manage your own roster row; the owner can delete anyone's
-        allow create, update: if signedIn() && memberUid == request.auth.uid;
+
+        // joining / editing your own row — but you can't change your own role
+        allow create: if signedIn() && memberUid == request.auth.uid
+          && request.resource.data.get('role', 'member') in ['member', 'owner'];
+        allow update: if signedIn() && (
+          teamData(teamId).ownerUid == request.auth.uid
+          || (
+            memberUid == request.auth.uid
+            && request.resource.data.get('role', 'member') == resource.data.get('role', 'member')
+          )
+        );
+
         allow delete: if signedIn() && (
           memberUid == request.auth.uid
           || teamData(teamId).ownerUid == request.auth.uid

@@ -115,8 +115,9 @@ users/{uid}/decks/{id}         { name, combos: [{ blade, ratchet, bit }], notes 
 teamCodes/{CODE}              { teamId }                       // invite-code lookup
 teams/{teamId}               { name, tag, region, color, bio, founded,
                                ownerUid, memberUids: [uid], inviteCode }
-teams/{teamId}/members/{uid} { bladerName, role, stats: { matchW, matchL, gameW, gameL,
-                               tournaments, bestPlacement } }
+teams/{teamId}/members/{uid} { bladerName, role: "owner"|"editor"|"member",
+                               stats: { matchW, matchL, gameW, gameL,
+                                        tournaments, bestPlacement } }
 teams/{teamId}/battles/{id}  { date, opponentTeam, format, event,
                                lineup: [{ player, result: "W"|"L", opponent }],
                                teamResult, notes }
