@@ -1,0 +1,809 @@
+import {
+  isConfigured,
+  auth,
+  onAuthStateChanged,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  sendPasswordResetEmail,
+} from "./firebase.js";
+import * as store from "./store.js";
+
+// ---------------------------------------------------------------------------
+// Tiny helpers
+// ---------------------------------------------------------------------------
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}
+
+function fmtDate(s) {
+  if (!s) return "—";
+  const d = new Date(s + (s.length === 10 ? "T00:00:00" : ""));
+  if (isNaN(d)) return esc(s);
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function toast(msg, kind = "ok") {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = `toast toast--${kind}`;
+  t.hidden = false;
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => (t.hidden = true), 2800);
+}
+
+const FINISHES = [
+  { key: "Spin", label: "Spin Finish", pts: 1 },
+  { key: "Over", label: "Over Finish", pts: 2 },
+  { key: "Burst", label: "Burst Finish", pts: 2 },
+  { key: "Xtreme", label: "Xtreme Finish", pts: 3 },
+];
+const finishLabel = (k) => FINISHES.find((f) => f.key === k)?.label || k;
+const finishPts = (k) => FINISHES.find((f) => f.key === k)?.pts || 0;
+
+// ---------------------------------------------------------------------------
+// Modal
+// ---------------------------------------------------------------------------
+const modal = {
+  open(title, bodyNode) {
+    $("#modal-title").textContent = title;
+    const body = $("#modal-body");
+    body.innerHTML = "";
+    body.append(bodyNode);
+    $("#modal").hidden = false;
+    document.body.style.overflow = "hidden";
+  },
+  close() {
+    $("#modal").hidden = true;
+    document.body.style.overflow = "";
+  },
+};
+$$("#modal [data-close]").forEach((b) => b.addEventListener("click", modal.close));
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("#modal").hidden) modal.close();
+});
+
+// Build a <form> from a field spec. Returns { form, values() }.
+function buildForm(fields, initial = {}) {
+  const form = document.createElement("form");
+  form.className = "entry-form";
+  for (const f of fields) {
+    if (f.type === "custom") { form.append(f.render(initial)); continue; }
+    const wrap = document.createElement("label");
+    wrap.className = "field";
+    const val = initial[f.name] ?? f.default ?? "";
+    let input;
+    if (f.type === "select") {
+      input = document.createElement("select");
+      for (const o of f.options) {
+        const opt = document.createElement("option");
+        opt.value = o.value; opt.textContent = o.label;
+        if (String(o.value) === String(val)) opt.selected = true;
+        input.append(opt);
+      }
+    } else if (f.type === "textarea") {
+      input = document.createElement("textarea");
+      input.rows = 3; input.value = val;
+    } else {
+      input = document.createElement("input");
+      input.type = f.type || "text";
+      input.value = val;
+    }
+    input.name = f.name;
+    if (f.required) input.required = true;
+    if (f.placeholder) input.placeholder = f.placeholder;
+    if (f.min != null) input.min = f.min;
+    if (f.step != null) input.step = f.step;
+    wrap.innerHTML = `<span>${esc(f.label)}</span>`;
+    wrap.append(input);
+    form.append(wrap);
+  }
+  const actions = document.createElement("div");
+  actions.className = "form-actions";
+  actions.innerHTML = `
+    <button type="button" class="btn btn-ghost" data-cancel>Cancel</button>
+    <button type="submit" class="btn btn-primary">Save</button>`;
+  form.append(actions);
+  actions.querySelector("[data-cancel]").addEventListener("click", modal.close);
+
+  return {
+    form,
+    values() {
+      const fd = new FormData(form);
+      return Object.fromEntries(fd.entries());
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+const state = {
+  view: "dashboard",
+  tournaments: [],
+  matches: [],
+  beys: [],
+  decks: [],
+  loaded: false,
+};
+
+async function refresh() {
+  const [tournaments, matches, beys, decks] = await Promise.all([
+    store.list("tournaments"),
+    store.list("matches"),
+    store.list("beys"),
+    store.list("decks"),
+  ]);
+  Object.assign(state, { tournaments, matches, beys, decks, loaded: true });
+}
+
+// ---------------------------------------------------------------------------
+// Auth view
+// ---------------------------------------------------------------------------
+let authMode = "signin";
+
+function initAuthUi() {
+  if (!isConfigured) {
+    $("#config-warning").hidden = false;
+    $("#auth-submit").disabled = true;
+  }
+  $$(".auth-tab").forEach((t) =>
+    t.addEventListener("click", () => {
+      authMode = t.dataset.mode;
+      $$(".auth-tab").forEach((x) => x.classList.toggle("is-active", x === t));
+      $("#field-name").hidden = authMode !== "signup";
+      $("#auth-submit").textContent = authMode === "signup" ? "Create account" : "Sign in";
+      $("#auth-password").autocomplete = authMode === "signup" ? "new-password" : "current-password";
+      $("#auth-error").hidden = true;
+    })
+  );
+
+  $("#auth-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("#auth-email").value.trim();
+    const password = $("#auth-password").value;
+    const name = $("#auth-name").value.trim();
+    const errEl = $("#auth-error");
+    errEl.hidden = true;
+    const btn = $("#auth-submit");
+    btn.disabled = true;
+    btn.textContent = "…";
+    try {
+      if (authMode === "signup") {
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        if (name) await updateProfile(cred.user, { displayName: name });
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) {
+      errEl.textContent = friendlyAuthError(err);
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = authMode === "signup" ? "Create account" : "Sign in";
+    }
+  });
+
+  $("#auth-reset").addEventListener("click", async () => {
+    const email = $("#auth-email").value.trim();
+    if (!email) return toast("Enter your email first, then click reset.", "warn");
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast("Password reset email sent.");
+    } catch (err) {
+      toast(friendlyAuthError(err), "err");
+    }
+  });
+}
+
+function friendlyAuthError(err) {
+  const code = (err && err.code) || "";
+  const map = {
+    "auth/invalid-email": "That email address looks invalid.",
+    "auth/missing-password": "Please enter a password.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/email-already-in-use": "An account with that email already exists.",
+    "auth/invalid-credential": "Wrong email or password.",
+    "auth/wrong-password": "Wrong email or password.",
+    "auth/user-not-found": "No account with that email.",
+    "auth/too-many-requests": "Too many attempts. Try again later.",
+    "auth/network-request-failed": "Network error. Check your connection.",
+  };
+  return map[code] || (err && err.message) || "Something went wrong.";
+}
+
+// ---------------------------------------------------------------------------
+// App shell
+// ---------------------------------------------------------------------------
+function initShell() {
+  $("#sign-out").addEventListener("click", () => signOut(auth));
+  $$("#tabs .tab").forEach((t) =>
+    t.addEventListener("click", () => switchView(t.dataset.view))
+  );
+}
+
+function switchView(view) {
+  state.view = view;
+  $$("#tabs .tab").forEach((t) => t.classList.toggle("is-active", t.dataset.view === view));
+  render();
+}
+
+function render() {
+  const main = $("#main");
+  if (!state.loaded) { main.innerHTML = `<div class="empty">Loading your data…</div>`; return; }
+  ({
+    dashboard: renderDashboard,
+    tournaments: renderTournaments,
+    matches: renderMatches,
+    collection: renderCollection,
+    decks: renderDecks,
+  }[state.view] || renderDashboard)(main);
+}
+
+// ---------------------------------------------------------------------------
+// Match maths
+// ---------------------------------------------------------------------------
+function matchScore(m) {
+  let mine = 0, opp = 0;
+  for (const g of m.games || []) {
+    if (g.winner === "me") mine += finishPts(g.finish);
+    else opp += finishPts(g.finish);
+  }
+  return { mine, opp };
+}
+function matchResult(m) {
+  if (m.result === "W" || m.result === "L") return m.result;
+  const { mine, opp } = matchScore(m);
+  if (mine === opp) return "—";
+  return mine > opp ? "W" : "L";
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+function renderDashboard(main) {
+  const { matches, tournaments, decks } = state;
+  const played = matches.filter((m) => matchResult(m) !== "—");
+  const wins = played.filter((m) => matchResult(m) === "W").length;
+  const losses = played.length - wins;
+
+  let gW = 0, gL = 0;
+  const scored = {}; const conceded = {};
+  for (const m of matches) for (const g of m.games || []) {
+    if (g.winner === "me") { gW++; scored[g.finish] = (scored[g.finish] || 0) + 1; }
+    else { gL++; conceded[g.finish] = (conceded[g.finish] || 0) + 1; }
+  }
+
+  const placements = tournaments
+    .map((t) => Number(t.placement))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  const best = placements.length ? Math.min(...placements) : null;
+
+  // win rate by deck
+  const byDeck = {};
+  for (const m of played) {
+    const key = m.myDeck || "Unspecified";
+    byDeck[key] = byDeck[key] || { w: 0, l: 0 };
+    if (matchResult(m) === "W") byDeck[key].w++; else byDeck[key].l++;
+  }
+  const deckRows = Object.entries(byDeck)
+    .map(([name, r]) => ({ name, ...r, total: r.w + r.l, rate: r.w / (r.w + r.l) }))
+    .sort((a, b) => b.total - a.total);
+
+  const recent = [...played]
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+    .slice(0, 12);
+
+  const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
+
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>Dashboard</h1>
+      <p class="muted">${state.userName ? esc(state.userName) + " · " : ""}${matches.length} matches · ${tournaments.length} tournaments</p>
+    </div>
+
+    <div class="stat-grid">
+      ${statCard("Match win rate", pct(wins, played.length) + "%", `${wins}W – ${losses}L`)}
+      ${statCard("Game win rate", pct(gW, gW + gL) + "%", `${gW}W – ${gL}L games`)}
+      ${statCard("Tournaments", tournaments.length, best ? `Best finish: ${ordinal(best)}` : "No placements yet")}
+      ${statCard("Decks tracked", decks.length, `${state.beys.length} parts in collection`)}
+    </div>
+
+    ${played.length === 0 ? `<div class="empty">No matches logged yet. Head to <b>Matches</b> to add your first one.</div>` : `
+    <div class="panel-row">
+      <section class="panel">
+        <h2>Finishes you scored</h2>
+        ${finishBars(scored, gW)}
+      </section>
+      <section class="panel">
+        <h2>Finishes scored on you</h2>
+        ${finishBars(conceded, gL)}
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Win rate by deck</h2>
+      ${deckRows.length ? `<table class="data-table">
+        <thead><tr><th>Deck</th><th>Record</th><th>Win rate</th></tr></thead>
+        <tbody>${deckRows.map((d) => `
+          <tr><td>${esc(d.name)}</td><td>${d.w}–${d.l}</td>
+          <td><div class="mini-bar"><span style="width:${Math.round(d.rate * 100)}%"></span></div> ${Math.round(d.rate * 100)}%</td></tr>`).join("")}
+        </tbody></table>` : `<p class="muted">Assign decks to matches to see this.</p>`}
+    </section>
+
+    <section class="panel">
+      <h2>Recent form</h2>
+      <div class="form-pills">
+        ${recent.map((m) => `<span class="pill pill--${matchResult(m) === "W" ? "w" : "l"}" title="${esc(m.opponent || "?")} · ${fmtDate(m.date)}">${matchResult(m)}</span>`).join("")}
+      </div>
+    </section>`}
+  `;
+}
+
+function statCard(label, value, sub) {
+  return `<div class="stat-card"><span class="stat-label">${esc(label)}</span>
+    <span class="stat-value">${esc(value)}</span>
+    <span class="stat-sub">${esc(sub)}</span></div>`;
+}
+
+function finishBars(counts, total) {
+  const rows = FINISHES.map((f) => {
+    const n = counts[f.key] || 0;
+    return `<div class="bar-row">
+      <span class="bar-label">${esc(f.label)}</span>
+      <div class="bar"><span style="width:${total ? Math.round((n / total) * 100) : 0}%"></span></div>
+      <span class="bar-num">${n}</span></div>`;
+  }).join("");
+  return `<div class="bars">${rows}</div>`;
+}
+
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// ---------------------------------------------------------------------------
+// Tournaments
+// ---------------------------------------------------------------------------
+function renderTournaments(main) {
+  const rows = [...state.tournaments].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>Tournaments</h1>
+      <button class="btn btn-primary" id="add-tournament">+ Add tournament</button>
+    </div>
+    ${rows.length === 0 ? `<div class="empty">No tournaments yet.</div>` : `
+    <div class="card-list">
+      ${rows.map((t) => {
+        const mCount = state.matches.filter((m) => m.tournamentId === t.id).length;
+        return `<article class="card">
+          <div class="card-main">
+            <h3>${esc(t.name || "Untitled tournament")}</h3>
+            <p class="muted">${fmtDate(t.date)}${t.location ? " · " + esc(t.location) : ""}${t.format ? " · " + esc(t.format) : ""}</p>
+            <div class="chips">
+              ${t.placement ? `<span class="chip chip--accent">${esc(ordinalMaybe(t.placement))}</span>` : ""}
+              ${t.wins != null || t.losses != null ? `<span class="chip">${Number(t.wins || 0)}–${Number(t.losses || 0)}</span>` : ""}
+              <span class="chip">${mCount} match${mCount === 1 ? "" : "es"}</span>
+            </div>
+            ${t.notes ? `<p class="card-notes">${esc(t.notes)}</p>` : ""}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" data-edit="${t.id}">Edit</button>
+            <button class="btn btn-ghost btn-sm danger" data-del="${t.id}">Delete</button>
+          </div>
+        </article>`;
+      }).join("")}
+    </div>`}
+  `;
+  $("#add-tournament").addEventListener("click", () => tournamentForm());
+  $$("[data-edit]", main).forEach((b) =>
+    b.addEventListener("click", () => tournamentForm(state.tournaments.find((t) => t.id === b.dataset.edit)))
+  );
+  $$("[data-del]", main).forEach((b) =>
+    b.addEventListener("click", () => confirmDelete("tournaments", b.dataset.del, "tournament"))
+  );
+}
+
+function ordinalMaybe(p) {
+  const n = Number(p);
+  return Number.isFinite(n) && n > 0 ? ordinal(n) : p;
+}
+
+function tournamentForm(existing) {
+  const { form, values } = buildForm([
+    { name: "name", label: "Tournament name", required: true, placeholder: "Local Store Challenge #4" },
+    { name: "date", label: "Date", type: "date", default: today() },
+    { name: "location", label: "Location", placeholder: "Hobby shop, city…" },
+    { name: "format", label: "Format", type: "select", options: [
+      "Swiss", "Single elimination", "Double elimination", "Round robin", "Swiss + Top cut", "Other",
+    ].map((v) => ({ value: v, label: v })) },
+    { name: "placement", label: "Final placement (number)", type: "number", min: 1, placeholder: "1" },
+    { name: "wins", label: "Wins", type: "number", min: 0 },
+    { name: "losses", label: "Losses", type: "number", min: 0 },
+    { name: "notes", label: "Notes", type: "textarea", placeholder: "What worked, what to change…" },
+  ], existing || {});
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    const data = {
+      name: v.name.trim(),
+      date: v.date || "",
+      location: v.location.trim(),
+      format: v.format,
+      placement: v.placement === "" ? null : Number(v.placement),
+      wins: v.wins === "" ? null : Number(v.wins),
+      losses: v.losses === "" ? null : Number(v.losses),
+      notes: v.notes.trim(),
+    };
+    await save("tournaments", existing, data);
+  });
+  modal.open(existing ? "Edit tournament" : "Add tournament", form);
+}
+
+// ---------------------------------------------------------------------------
+// Matches
+// ---------------------------------------------------------------------------
+function renderMatches(main) {
+  const rows = [...state.matches].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>Matches</h1>
+      <button class="btn btn-primary" id="add-match">+ Log match</button>
+    </div>
+    ${rows.length === 0 ? `<div class="empty">No matches logged yet.</div>` : `
+    <div class="card-list">
+      ${rows.map((m) => {
+        const res = matchResult(m);
+        const { mine, opp } = matchScore(m);
+        const tourney = state.tournaments.find((t) => t.id === m.tournamentId);
+        return `<article class="card">
+          <div class="card-main">
+            <div class="match-top">
+              <span class="result-badge result-badge--${res === "W" ? "w" : res === "L" ? "l" : "x"}">${res}</span>
+              <h3>vs ${esc(m.opponent || "Unknown")}</h3>
+              ${(mine || opp) ? `<span class="score">${mine}–${opp}</span>` : ""}
+            </div>
+            <p class="muted">${fmtDate(m.date)}${tourney ? " · " + esc(tourney.name) : ""}${m.myDeck ? " · " + esc(m.myDeck) : ""}${m.opponentDeck ? " vs " + esc(m.opponentDeck) : ""}</p>
+            ${(m.games || []).length ? `<div class="game-line">
+              ${m.games.map((g) => `<span class="game-tag game-tag--${g.winner === "me" ? "w" : "l"}">${g.winner === "me" ? "W" : "L"} · ${esc(finishLabel(g.finish))}</span>`).join("")}
+            </div>` : ""}
+            ${m.notes ? `<p class="card-notes">${esc(m.notes)}</p>` : ""}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" data-edit="${m.id}">Edit</button>
+            <button class="btn btn-ghost btn-sm danger" data-del="${m.id}">Delete</button>
+          </div>
+        </article>`;
+      }).join("")}
+    </div>`}
+  `;
+  $("#add-match").addEventListener("click", () => matchForm());
+  $$("[data-edit]", main).forEach((b) =>
+    b.addEventListener("click", () => matchForm(state.matches.find((m) => m.id === b.dataset.edit)))
+  );
+  $$("[data-del]", main).forEach((b) =>
+    b.addEventListener("click", () => confirmDelete("matches", b.dataset.del, "match"))
+  );
+}
+
+function matchForm(existing) {
+  const games = structuredClone(existing?.games || []);
+
+  const deckOptions = [
+    { value: "", label: "— none —" },
+    ...state.decks.map((d) => ({ value: d.name, label: d.name })),
+  ];
+
+  const gamesSection = () => {
+    const box = document.createElement("div");
+    box.className = "games-editor";
+    const draw = () => {
+      box.innerHTML = `<div class="field"><span>Games</span></div>`;
+      games.forEach((g, i) => {
+        const row = document.createElement("div");
+        row.className = "game-edit-row";
+        row.innerHTML = `
+          <select data-k="winner">
+            <option value="me"${g.winner === "me" ? " selected" : ""}>I won</option>
+            <option value="opp"${g.winner === "opp" ? " selected" : ""}>Opponent won</option>
+          </select>
+          <select data-k="finish">
+            ${FINISHES.map((f) => `<option value="${f.key}"${g.finish === f.key ? " selected" : ""}>${f.label} (${f.pts}pt)</option>`).join("")}
+          </select>
+          <button type="button" class="btn btn-ghost btn-sm danger" data-rm="${i}">✕</button>`;
+        row.querySelector('[data-k="winner"]').addEventListener("change", (e) => (games[i].winner = e.target.value));
+        row.querySelector('[data-k="finish"]').addEventListener("change", (e) => (games[i].finish = e.target.value));
+        row.querySelector("[data-rm]").addEventListener("click", () => { games.splice(i, 1); draw(); });
+        box.append(row);
+      });
+      const add = document.createElement("button");
+      add.type = "button";
+      add.className = "btn btn-ghost btn-sm";
+      add.textContent = "+ Add game";
+      add.addEventListener("click", () => { games.push({ winner: "me", finish: "Spin" }); draw(); });
+      box.append(add);
+      const hint = document.createElement("p");
+      hint.className = "muted small";
+      hint.textContent = "First to 4 points wins. Leave empty and set the result manually below.";
+      box.append(hint);
+    };
+    draw();
+    return box;
+  };
+
+  const { form, values } = buildForm([
+    { name: "date", label: "Date", type: "date", default: today() },
+    { name: "tournamentId", label: "Tournament", type: "select", options: [
+      { value: "", label: "— none / casual —" },
+      ...state.tournaments.map((t) => ({ value: t.id, label: t.name || "Untitled" })),
+    ] },
+    { name: "opponent", label: "Opponent", required: true, placeholder: "Blader name" },
+    { name: "myDeck", label: "My deck", type: "select", options: deckOptions },
+    { name: "opponentDeck", label: "Opponent deck (optional)", placeholder: "e.g. Dran Sword" },
+    { type: "custom", render: gamesSection },
+    { name: "result", label: "Result (if no games above)", type: "select", options: [
+      { value: "", label: "Auto from games" }, { value: "W", label: "Win" }, { value: "L", label: "Loss" },
+    ] },
+    { name: "notes", label: "Notes", type: "textarea" },
+  ], existing || {});
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    const clean = games.filter((g) => g.winner && g.finish);
+    const data = {
+      date: v.date || "",
+      tournamentId: v.tournamentId || null,
+      opponent: v.opponent.trim(),
+      myDeck: v.myDeck || "",
+      opponentDeck: v.opponentDeck.trim(),
+      games: clean,
+      result: clean.length ? "" : v.result,
+      notes: v.notes.trim(),
+    };
+    await save("matches", existing, data);
+  });
+  modal.open(existing ? "Edit match" : "Log match", form);
+}
+
+// ---------------------------------------------------------------------------
+// Collection
+// ---------------------------------------------------------------------------
+const PART_TYPES = ["Blade", "Ratchet", "Bit"];
+
+function renderCollection(main) {
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>Collection</h1>
+      <button class="btn btn-primary" id="add-bey">+ Add part</button>
+    </div>
+    ${state.beys.length === 0 ? `<div class="empty">No parts yet. Add your blades, ratchets and bits.</div>` : `
+    <div class="collection-grid">
+      ${PART_TYPES.map((type) => {
+        const items = state.beys.filter((b) => b.type === type);
+        return `<section class="panel">
+          <h2>${type}s <span class="muted">(${items.length})</span></h2>
+          ${items.length ? `<ul class="part-list">
+            ${items.map((b) => `<li>
+              <div><b>${esc(b.name)}</b>${b.notes ? `<span class="muted"> — ${esc(b.notes)}</span>` : ""}</div>
+              <span class="row-actions">
+                <button class="btn-link" data-edit="${b.id}">edit</button>
+                <button class="btn-link danger" data-del="${b.id}">delete</button>
+              </span>
+            </li>`).join("")}
+          </ul>` : `<p class="muted">—</p>`}
+        </section>`;
+      }).join("")}
+    </div>`}
+  `;
+  $("#add-bey").addEventListener("click", () => beyForm());
+  $$("[data-edit]", main).forEach((b) =>
+    b.addEventListener("click", () => beyForm(state.beys.find((x) => x.id === b.dataset.edit)))
+  );
+  $$("[data-del]", main).forEach((b) =>
+    b.addEventListener("click", () => confirmDelete("beys", b.dataset.del, "part"))
+  );
+}
+
+function beyForm(existing) {
+  const { form, values } = buildForm([
+    { name: "type", label: "Part type", type: "select", options: PART_TYPES.map((v) => ({ value: v, label: v })) },
+    { name: "name", label: "Name", required: true, placeholder: "Dran Sword / 3-60 / Flat" },
+    { name: "notes", label: "Notes", type: "textarea", placeholder: "Condition, source, weight…" },
+  ], existing || {});
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    await save("beys", existing, { type: v.type, name: v.name.trim(), notes: v.notes.trim() });
+  });
+  modal.open(existing ? "Edit part" : "Add part", form);
+}
+
+// ---------------------------------------------------------------------------
+// Decks
+// ---------------------------------------------------------------------------
+function renderDecks(main) {
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>Decks</h1>
+      <button class="btn btn-primary" id="add-deck">+ Add deck</button>
+    </div>
+    ${state.decks.length === 0 ? `<div class="empty">No decks yet. Build a 3-Bey deck.</div>` : `
+    <div class="card-list">
+      ${state.decks.map((d) => {
+        const used = state.matches.filter((m) => m.myDeck === d.name);
+        const w = used.filter((m) => matchResult(m) === "W").length;
+        const l = used.filter((m) => matchResult(m) === "L").length;
+        return `<article class="card">
+          <div class="card-main">
+            <h3>${esc(d.name)}</h3>
+            <ol class="combo-list">
+              ${(d.combos || []).filter((c) => c.blade || c.ratchet || c.bit).map((c) =>
+                `<li>${esc([c.blade, c.ratchet, c.bit].filter(Boolean).join(" "))}</li>`).join("") || "<li class='muted'>No combos set</li>"}
+            </ol>
+            <div class="chips">
+              <span class="chip">${used.length} match${used.length === 1 ? "" : "es"}</span>
+              ${used.length ? `<span class="chip chip--accent">${w}–${l}</span>` : ""}
+            </div>
+            ${d.notes ? `<p class="card-notes">${esc(d.notes)}</p>` : ""}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" data-edit="${d.id}">Edit</button>
+            <button class="btn btn-ghost btn-sm danger" data-del="${d.id}">Delete</button>
+          </div>
+        </article>`;
+      }).join("")}
+    </div>`}
+  `;
+  $("#add-deck").addEventListener("click", () => deckForm());
+  $$("[data-edit]", main).forEach((b) =>
+    b.addEventListener("click", () => deckForm(state.decks.find((d) => d.id === b.dataset.edit)))
+  );
+  $$("[data-del]", main).forEach((b) =>
+    b.addEventListener("click", () => confirmDelete("decks", b.dataset.del, "deck"))
+  );
+}
+
+function deckForm(existing) {
+  const combos = structuredClone(existing?.combos || [{}, {}, {}]);
+  while (combos.length < 3) combos.push({});
+
+  const comboSection = () => {
+    const box = document.createElement("div");
+    box.className = "combo-editor";
+    box.innerHTML = `<div class="field"><span>Combos (Blade · Ratchet · Bit)</span></div>`;
+    combos.forEach((c, i) => {
+      const row = document.createElement("div");
+      row.className = "combo-edit-row";
+      row.innerHTML = `
+        <input placeholder="Blade" value="${esc(c.blade || "")}" data-k="blade" list="blades-list" />
+        <input placeholder="Ratchet" value="${esc(c.ratchet || "")}" data-k="ratchet" list="ratchets-list" />
+        <input placeholder="Bit" value="${esc(c.bit || "")}" data-k="bit" list="bits-list" />`;
+      row.querySelectorAll("input").forEach((inp) =>
+        inp.addEventListener("input", (e) => (combos[i][e.target.dataset.k] = e.target.value.trim()))
+      );
+      box.append(row);
+    });
+    box.append(partDatalists());
+    return box;
+  };
+
+  const { form, values } = buildForm([
+    { name: "name", label: "Deck name", required: true, placeholder: "Attack Aggro" },
+    { type: "custom", render: comboSection },
+    { name: "notes", label: "Notes", type: "textarea" },
+  ], existing || {});
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    await save("decks", existing, {
+      name: v.name.trim(),
+      combos: combos.map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "" })),
+      notes: v.notes.trim(),
+    });
+  });
+  modal.open(existing ? "Edit deck" : "Add deck", form);
+}
+
+function partDatalists() {
+  const frag = document.createDocumentFragment();
+  const make = (id, type) => {
+    const dl = document.createElement("datalist");
+    dl.id = id;
+    [...new Set(state.beys.filter((b) => b.type === type).map((b) => b.name))].forEach((n) => {
+      const o = document.createElement("option");
+      o.value = n;
+      dl.append(o);
+    });
+    frag.append(dl);
+  };
+  make("blades-list", "Blade");
+  make("ratchets-list", "Ratchet");
+  make("bits-list", "Bit");
+  return frag;
+}
+
+// ---------------------------------------------------------------------------
+// Shared save / delete
+// ---------------------------------------------------------------------------
+async function save(coll, existing, data) {
+  try {
+    if (existing) await store.update(coll, existing.id, data);
+    else await store.create(coll, data);
+    await refresh();
+    modal.close();
+    render();
+    toast("Saved.");
+  } catch (err) {
+    console.error(err);
+    toast(err.message || "Could not save.", "err");
+  }
+}
+
+function confirmDelete(coll, id, noun) {
+  const box = document.createElement("div");
+  box.innerHTML = `<p>Delete this ${noun}? This can't be undone.</p>
+    <div class="form-actions">
+      <button class="btn btn-ghost" data-cancel>Cancel</button>
+      <button class="btn btn-danger" data-go>Delete</button>
+    </div>`;
+  box.querySelector("[data-cancel]").addEventListener("click", modal.close);
+  box.querySelector("[data-go]").addEventListener("click", async () => {
+    try {
+      await store.remove(coll, id);
+      await refresh();
+      modal.close();
+      render();
+      toast(`${noun[0].toUpperCase() + noun.slice(1)} deleted.`);
+    } catch (err) {
+      toast(err.message || "Could not delete.", "err");
+    }
+  });
+  modal.open(`Delete ${noun}`, box);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
+initAuthUi();
+initShell();
+
+if (!isConfigured) {
+  $("#app-loading").hidden = true;
+  $("#auth-view").hidden = false;
+} else {
+  onAuthStateChanged(auth, async (user) => {
+    $("#app-loading").hidden = true;
+    if (user) {
+      state.userName = user.displayName || user.email;
+      $("#user-label").textContent = state.userName;
+      $("#auth-view").hidden = true;
+      $("#shell").hidden = false;
+      state.loaded = false;
+      render();
+      try {
+        await refresh();
+      } catch (err) {
+        console.error(err);
+        toast("Could not load data. Check your Firestore rules.", "err");
+      }
+      render();
+    } else {
+      state.loaded = false;
+      $("#shell").hidden = true;
+      $("#auth-view").hidden = false;
+    }
+  });
+}

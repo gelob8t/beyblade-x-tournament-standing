@@ -1,1 +1,107 @@
-# beyblade-x-tournament-standing
+# Beyblade X Journey 🌀
+
+A single-page web app for recording your **Beyblade X tournament journey** — tournaments,
+match results, your parts collection, decks, and a stats dashboard. It's a static site
+(no build step) with accounts and cloud storage powered by **Firebase**, hosted on
+**GitHub Pages**.
+
+## What you can track
+
+| Section | What goes in it |
+| --- | --- |
+| **Tournaments** | Name, date, location, format, final placement, W–L, notes |
+| **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes |
+| **Collection** | Owned Blades, Ratchets and Bits |
+| **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
+| **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
+
+Each account's data is private and syncs across any device you sign in on.
+
+---
+
+## Setup
+
+### 1. Create a Firebase project (free)
+
+1. Go to <https://console.firebase.google.com/> → **Add project**.
+2. Once it's created, click the **`</>` (Web)** icon to register a web app. Skip Hosting.
+3. Copy the `firebaseConfig` values it shows you.
+
+### 2. Enable Auth and Firestore
+
+- **Build → Authentication → Get started → Sign-in method →** enable **Email/Password**.
+- **Build → Firestore Database → Create database →** start in **production mode**, pick a location.
+- Open the **Rules** tab, paste the contents of [`firestore.rules`](firestore.rules), and **Publish**.
+
+### 3. Add your config to the app
+
+Edit [`js/firebase-config.js`](js/firebase-config.js) and replace every `REPLACE_ME`
+with the values from step 1:
+
+```js
+export const firebaseConfig = {
+  apiKey: "AIza...",
+  authDomain: "your-project.firebaseapp.com",
+  projectId: "your-project",
+  storageBucket: "your-project.appspot.com",
+  messagingSenderId: "1234567890",
+  appId: "1:1234567890:web:abcdef",
+};
+```
+
+> These values are **not secrets** — they're safe to commit. Your data is protected by
+> the Firestore rules (each user only touches `users/{their-uid}/…`), not by hiding the config.
+
+### 4. Authorize your GitHub Pages domain in Firebase
+
+Firebase Auth → **Settings → Authorized domains → Add domain** →
+`your-username.github.io`.
+
+---
+
+## Deploy to GitHub Pages
+
+1. Push this repo to GitHub.
+2. Repo **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. The included workflow ([`.github/workflows/deploy.yml`](.github/workflows/deploy.yml))
+   publishes the site on every push to `main`.
+4. Your site will be at `https://<username>.github.io/<repo>/`.
+
+---
+
+## Run locally
+
+Because it uses ES modules, open it through a tiny web server (not `file://`):
+
+```bash
+python -m http.server 8000
+```
+
+Then visit <http://localhost:8000>. For local dev, add `localhost` to Firebase's
+authorized domains (it's usually there by default).
+
+---
+
+## Project layout
+
+```
+index.html            markup + view containers
+styles.css            all styling (Beyblade X dark theme)
+js/
+  firebase-config.js   <-- you edit this
+  firebase.js          Firebase init + re-exports (CDN, no build)
+  store.js             Firestore CRUD, scoped to users/{uid}/...
+  app.js               auth flow, views, forms, stats
+firestore.rules        security rules to paste into Firebase
+```
+
+## Data model
+
+```
+users/{uid}/tournaments/{id}   { name, date, location, format, placement, wins, losses, notes }
+users/{uid}/matches/{id}       { date, tournamentId, opponent, myDeck, opponentDeck,
+                                 games: [{ winner: "me"|"opp", finish: "Spin"|"Over"|"Burst"|"Xtreme" }],
+                                 result, notes }
+users/{uid}/beys/{id}          { type: "Blade"|"Ratchet"|"Bit", name, notes }
+users/{uid}/decks/{id}         { name, combos: [{ blade, ratchet, bit }], notes }
+```
