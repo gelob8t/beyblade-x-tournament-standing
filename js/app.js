@@ -677,8 +677,17 @@ async function openFriendProfile(uid) {
   if (state.openFriend === uid) render();
 }
 
+function updateTabBadges() {
+  const tab = $('#tabs .tab[data-view="friends"]');
+  if (!tab) return;
+  const n = state.friendReqIn.length;
+  tab.dataset.badge = n > 0 ? String(n) : "";
+  tab.classList.toggle("has-badge", n > 0);
+}
+
 function render() {
   const main = $("#main");
+  updateTabBadges();
   if (!state.loaded) { main.innerHTML = `<div class="empty">Loading your data…</div>`; return; }
   if (state.view === "friends" && state.openFriend) return renderFriendProfile(main);
   ({
@@ -687,6 +696,7 @@ function render() {
     matches: renderMatches,
     collection: renderCollection,
     decks: renderDecks,
+    stats: renderStats,
     team: renderTeam,
     friends: renderFriends,
   }[state.view] || renderDashboard)(main);
@@ -776,36 +786,49 @@ function renderDashboard(main) {
 
     ${feedPanel()}
 
-    ${played.length === 0 ? `<div class="empty">No matches logged yet. Head to <b>Matches</b> to add your first one.</div>` : `
-    <div class="panel-row">
-      <section class="panel">
-        <h2>Finishes you scored</h2>
-        ${finishBars(scored, gW)}
-      </section>
-      <section class="panel">
-        <h2>Finishes scored on you</h2>
-        ${finishBars(conceded, gL)}
-      </section>
-    </div>
-
-    <section class="panel">
-      <h2>Win rate by deck</h2>
-      ${deckRows.length ? `<div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Deck</th><th>Record</th><th>Win rate</th></tr></thead>
-        <tbody>${deckRows.map((d) => `
-          <tr><td>${esc(d.name)}</td><td>${d.w}–${d.l}</td>
-          <td><div class="mini-bar"><span style="width:${Math.round(d.rate * 100)}%"></span></div> ${Math.round(d.rate * 100)}%</td></tr>`).join("")}
-        </tbody></table></div>` : `<p class="muted">Assign decks to matches to see this.</p>`}
-    </section>
-
-    <section class="panel">
-      <h2>Recent form</h2>
-      <div class="form-pills">
-        ${recent.map((m) => `<span class="pill pill--${matchResult(m) === "W" ? "w" : "l"}" title="${esc(m.opponent || "?")} · ${fmtDate(m.date)}">${matchResult(m)}</span>`).join("")}
-      </div>
-    </section>`}
+    ${played.length === 0
+      ? onboardingPanel()
+      : `<section class="panel">
+          <div class="row-between" style="margin-bottom:.6rem">
+            <h2 style="margin:0">Recent form</h2>
+            <button class="btn btn-ghost btn-sm" id="go-stats">Full stats →</button>
+          </div>
+          <div class="form-pills">
+            ${recent.map((m) => `<span class="pill pill--${matchResult(m) === "W" ? "w" : "l"}" title="${esc(m.opponent || "?")} · ${fmtDate(m.date)}">${matchResult(m)}</span>`).join("")}
+          </div>
+        </section>`}
   `;
   wireFeedClicks(main);
+  const gs = $("#go-stats");
+  if (gs) gs.addEventListener("click", () => switchView("stats"));
+  $$("[data-goto]", main).forEach((b) =>
+    b.addEventListener("click", () => {
+      const v = b.dataset.goto;
+      if (v === "dashboard") profileForm();
+      else switchView(v);
+    })
+  );
+}
+
+function onboardingPanel() {
+  const done = {
+    parts: state.beys.length > 0,
+    deck: state.decks.length > 0,
+    match: state.matches.length > 0,
+    profile: !!(state.profile.bladerName || state.profile.region),
+  };
+  const step = (ok, label, view) =>
+    `<li class="ob-step${ok ? " is-done" : ""}"><span class="ob-check">${ok ? "✓" : ""}</span>
+      <button class="btn-link" data-goto="${view}">${esc(label)}</button></li>`;
+  return `<section class="panel">
+    <h2>Get started</h2>
+    <ul class="ob-list">
+      ${step(done.parts, "Add your beys to the Collection", "collection")}
+      ${step(done.deck, "Build a deck", "decks")}
+      ${step(done.match, "Log your first match", "matches")}
+      ${step(done.profile, "Fill in your profile", "dashboard")}
+    </ul>
+  </section>`;
 }
 
 function wireFeedClicks(root) {
@@ -880,6 +903,127 @@ function finishBars(counts, total) {
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+function renderStats(main) {
+  const played = state.matches
+    .filter((m) => matchResult(m) !== "—")
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+
+  if (played.length === 0) {
+    main.innerHTML = `<div class="view-head"><h1>Stats</h1></div>
+      <div class="empty">Log a few matches and your stats will build up here.</div>`;
+    return;
+  }
+
+  const wins = played.filter((m) => matchResult(m) === "W").length;
+  const rate = Math.round((wins / played.length) * 100);
+
+  let gW = 0, gL = 0;
+  const scored = {}, conceded = {};
+  for (const m of state.matches) for (const g of m.games || []) {
+    if (g.winner === "me") { gW++; scored[g.finish] = (scored[g.finish] || 0) + 1; }
+    else { gL++; conceded[g.finish] = (conceded[g.finish] || 0) + 1; }
+  }
+
+  // streaks (chronological)
+  let cur = 0, curType = "", longestW = 0, run = 0;
+  for (const m of played) {
+    const r = matchResult(m);
+    if (r === "W") { run = run >= 0 ? run + 1 : 1; longestW = Math.max(longestW, run); }
+    else { run = run <= 0 ? run - 1 : -1; }
+  }
+  cur = Math.abs(run); curType = run > 0 ? "win" : run < 0 ? "loss" : "";
+
+  // by month
+  const months = {};
+  for (const m of played) {
+    const k = (m.date || "").slice(0, 7) || "unknown";
+    months[k] = months[k] || { w: 0, n: 0 };
+    months[k].n++;
+    if (matchResult(m) === "W") months[k].w++;
+  }
+  const monthRows = Object.entries(months)
+    .filter(([k]) => k !== "unknown")
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-12)
+    .map(([k, v]) => ({ label: monthLabel(k), rate: v.w / v.n, n: v.n }));
+
+  // head to head
+  const h2h = groupRecord(played, (m) => (m.opponent || "").trim() || "Unknown");
+  // matchup vs opponent deck
+  const vsDeck = groupRecord(played, (m) => (m.opponentDeck || "").trim());
+  const myDeck = groupRecord(played, (m) => (m.myDeck || "").trim() || "Unspecified");
+
+  main.innerHTML = `
+    <div class="view-head"><h1>Stats</h1><p class="muted">${played.length} rated matches</p></div>
+
+    <div class="stat-grid">
+      ${statCard("Match win rate", rate + "%", `${wins}W – ${played.length - wins}L`)}
+      ${statCard("Game win rate", (gW + gL ? Math.round((gW / (gW + gL)) * 100) : 0) + "%", `${gW}W – ${gL}L games`)}
+      ${statCard("Current streak", cur ? cur + (curType === "win" ? " W" : " L") : "—", curType ? `on a ${curType} streak` : "even")}
+      ${statCard("Longest win streak", longestW || "—", "best run of wins")}
+    </div>
+
+    <section class="panel">
+      <h2>Win rate by month</h2>
+      ${monthRows.length ? `<div class="bars">${monthRows.map((r) => `
+        <div class="bar-row">
+          <span class="bar-label">${esc(r.label)}</span>
+          <div class="bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div>
+          <span class="bar-num">${Math.round(r.rate * 100)}%</span>
+        </div>`).join("")}</div>
+        <p class="muted small">${monthRows.map((r) => r.n).reduce((a, b) => a + b, 0)} matches across ${monthRows.length} month${monthRows.length === 1 ? "" : "s"}</p>`
+        : `<p class="muted">Add dates to your matches to see a trend.</p>`}
+    </section>
+
+    <div class="panel-row">
+      <section class="panel"><h2>Finishes you scored</h2>${finishBars(scored, gW)}</section>
+      <section class="panel"><h2>Finishes scored on you</h2>${finishBars(conceded, gL)}</section>
+    </div>
+
+    ${recordTable("Your decks", myDeck, "Deck")}
+    ${recordTable("Head-to-head", h2h, "Opponent")}
+    ${vsDeck.length ? recordTable("Vs. opponent bey / deck", vsDeck, "Their bey") : ""}
+  `;
+}
+
+function monthLabel(k) {
+  const [y, m] = k.split("-");
+  const d = new Date(Number(y), Number(m) - 1, 1);
+  return isNaN(d) ? k : d.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
+}
+
+function groupRecord(matches, keyFn) {
+  const g = {};
+  for (const m of matches) {
+    const key = keyFn(m);
+    if (!key) continue;
+    g[key] = g[key] || { w: 0, l: 0 };
+    if (matchResult(m) === "W") g[key].w++; else g[key].l++;
+  }
+  return Object.entries(g)
+    .map(([name, r]) => ({ name, ...r, total: r.w + r.l, rate: r.w / (r.w + r.l) }))
+    .sort((a, b) => b.total - a.total || b.rate - a.rate)
+    .slice(0, 12);
+}
+
+function recordTable(title, rows, col) {
+  if (!rows.length) return "";
+  return `<section class="panel">
+    <h2>${esc(title)}</h2>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>${esc(col)}</th><th>Record</th><th>Win rate</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr>
+        <td>${esc(r.name)}</td>
+        <td>${r.w}–${r.l}</td>
+        <td><div class="mini-bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div> ${Math.round(r.rate * 100)}%</td>
+      </tr>`).join("")}</tbody>
+    </table></div>
+  </section>`;
 }
 
 // ---------------------------------------------------------------------------
