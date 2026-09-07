@@ -18,6 +18,10 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 | **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |
 | **Friends activity** | Dashboard feed of friends' recent matches / placements — shown only for friends who set their activity to **Public** (Edit profile → Match activity visibility; default Private) |
+| **Live scoring** | Full-screen, big-button mode to score a match at the table — tap who won each game, pick the finish, first to 4 points, save straight to Matches |
+
+Works **offline** (IndexedDB cache): reads come from the local cache, writes queue
+and sync when you reconnect. Deletes are instant with a 6-second **Undo**.
 | **Friend profiles** | Tap a friend (list or feed) to open their profile: identity, record, and full match history — history shown only if their activity is Public |
 
 Each account's personal journey is private and syncs across any device you sign in on.
