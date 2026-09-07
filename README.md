@@ -1,9 +1,9 @@
 # Beyblade X Journey 🌀
 
 A single-page web app for recording your **Beyblade X tournament journey** — tournaments,
-match results, your parts collection, decks, and a stats dashboard. It's a static site
-(no build step) with accounts and cloud storage powered by **Firebase**, hosted on
-**GitHub Pages**.
+match results, your parts collection, decks, teams, friends, and deep stats. It's a
+static site (no build step) with accounts and cloud storage powered by **Firebase**,
+hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 
 ## What you can track
 
@@ -38,8 +38,11 @@ Team data (roster, battles, events) is shared with everyone on that team.
 - **Build → Authentication → Get started → Sign-in method →** enable **Email/Password**.
 - **Build → Firestore Database → Create database →** start in **production mode**, pick a location.
 - Open the **Rules** tab, paste the contents of [`firestore.rules`](firestore.rules), and **Publish**.
-  (Re-paste whenever `firestore.rules` changes in this repo — the Team feature added rules for
-  the shared `teams/` and `teamCodes/` collections.)
+
+> **Automate rules** so you never have to paste again: run `npx firebase-tools login:ci`
+> locally once, then add the printed token as a repo secret named `FIREBASE_TOKEN`
+> (Settings → Secrets and variables → Actions). The deploy workflow then publishes
+> `firestore.rules` on every push; without the secret it just prints a reminder.
 
 ### 3. Add your config to the app
 
@@ -88,6 +91,8 @@ python -m http.server 8000
 Then visit <http://localhost:8000>. For local dev, add `localhost` to Firebase's
 authorized domains (it's usually there by default).
 
+Run the unit tests with `npm test` (Node's built-in test runner — no deps).
+
 ---
 
 ## Project layout
@@ -95,14 +100,20 @@ authorized domains (it's usually there by default).
 ```
 index.html            markup + view containers
 styles.css            all styling (Beyblade X dark theme)
+manifest.webmanifest  PWA manifest;  sw.js  network-first service worker
+icons/                app icons (192 / 512 / maskable / apple-touch)
 js/
   firebase-config.js   <-- you edit this
   firebase.js          Firebase init + re-exports (CDN, no build)
   store.js             Firestore CRUD, scoped to users/{uid}/...
+  stats.js             pure match/stat math (unit-tested)
   teams.js             shared team data (teams/... and teamCodes/...)
-  friends.js           friend codes, requests, friendships, player cards
-  app.js               auth flow, views, forms, stats
-firestore.rules        security rules to paste into Firebase
+  friends.js           friend codes, requests, friendships, cards, activity feed
+  app.js               auth flow, views, forms, wiring
+firestore.rules        security rules (auto-deployed if FIREBASE_TOKEN is set)
+firebase.json          points firebase-tools at firestore.rules
+test/stats.test.mjs    unit tests, run in CI before every deploy
+.github/workflows/deploy.yml   test -> (rules + Pages), with SHA cache-busting
 ```
 
 ## Data model
