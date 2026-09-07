@@ -13,12 +13,13 @@
 // ---------------------------------------------------------------------------
 
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  projectId: "REPLACE_ME",
-  storageBucket: "REPLACE_ME.appspot.com",
-  messagingSenderId: "REPLACE_ME",
-  appId: "REPLACE_ME",
+  apiKey: "AIzaSyCWLCuFOiK8bKH2h6o-Stz17bHFa3PLxoM",
+  authDomain: "beybladex-journey.firebaseapp.com",
+  projectId: "beybladex-journey",
+  storageBucket: "beybladex-journey.firebasestorage.app",
+  messagingSenderId: "587875395355",
+  appId: "1:587875395355:web:9e40b0489dd773b12995be",
+  measurementId: "G-BNEEVBNLL4"
 };
 
 // Leave this check as-is. It shows a friendly warning until you fill in the config.
