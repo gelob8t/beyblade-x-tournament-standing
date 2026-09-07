@@ -122,6 +122,58 @@ function buildForm(fields, initial = {}) {
   };
 }
 
+// Run an async action from a button click, showing a spinner on that button
+// until it finishes. Restores the button if it's still on screen.
+async function runBtn(btn, label, fn) {
+  const restore = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add("is-loading");
+  btn.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span><span>${esc(label)}</span>`;
+  try {
+    await fn();
+  } catch (err) {
+    console.error(err);
+    toast(err.message || "Something went wrong.", "err");
+  } finally {
+    if (btn.isConnected) {
+      btn.disabled = false;
+      btn.classList.remove("is-loading");
+      btn.innerHTML = restore;
+    }
+  }
+}
+
+// Wire a form's submit to an async handler, showing a spinner on the primary
+// button while it runs and re-enabling it if the handler throws / leaves the
+// form on screen.
+function bindSubmit(form, handler) {
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const btn =
+      form.querySelector('.form-actions .btn-primary') ||
+      form.querySelector('button[type="submit"]');
+    let restore = "";
+    if (btn) {
+      restore = btn.innerHTML;
+      btn.disabled = true;
+      btn.classList.add("is-loading");
+      btn.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span><span>Saving…</span>`;
+    }
+    try {
+      await handler();
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Something went wrong.", "err");
+    } finally {
+      if (btn && btn.isConnected) {
+        btn.disabled = false;
+        btn.classList.remove("is-loading");
+        btn.innerHTML = restore;
+      }
+    }
+  });
+}
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -257,7 +309,8 @@ function initAuthUi() {
     errEl.hidden = true;
     const btn = $("#auth-submit");
     btn.disabled = true;
-    btn.textContent = "…";
+    btn.classList.add("is-loading");
+    btn.innerHTML = `<span class="btn-spinner" aria-hidden="true"></span><span>${authMode === "signup" ? "Creating…" : "Signing in…"}</span>`;
     try {
       if (authMode === "signup") {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
@@ -270,6 +323,7 @@ function initAuthUi() {
       errEl.hidden = false;
     } finally {
       btn.disabled = false;
+      btn.classList.remove("is-loading");
       btn.textContent = authMode === "signup" ? "Create account" : "Sign in";
     }
   });
@@ -365,8 +419,7 @@ function profileForm() {
     { name: "bio", label: "Bio / goals", type: "textarea", placeholder: "This season I want to…" },
   ], p);
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     const data = {
       bladerName: v.bladerName.trim(),
@@ -630,8 +683,7 @@ function tournamentForm(existing) {
     { name: "notes", label: "Notes", type: "textarea", placeholder: "What worked, what to change…" },
   ], existing || {});
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     const data = {
       name: v.name.trim(),
@@ -755,8 +807,7 @@ function matchForm(existing) {
     { name: "notes", label: "Notes", type: "textarea" },
   ], existing || {});
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     const clean = games.filter((g) => g.winner && g.finish);
     const data = {
@@ -819,8 +870,7 @@ function beyForm(existing) {
     { name: "name", label: "Name", required: true, placeholder: "Dran Sword / 3-60 / Flat" },
     { name: "notes", label: "Notes", type: "textarea", placeholder: "Condition, source, weight…" },
   ], existing || {});
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     await save("beys", existing, { type: v.type, name: v.name.trim(), notes: v.notes.trim() });
   });
@@ -902,8 +952,7 @@ function deckForm(existing) {
     { name: "notes", label: "Notes", type: "textarea" },
   ], existing || {});
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     await save("decks", existing, {
       name: v.name.trim(),
@@ -1024,12 +1073,14 @@ function teamRoster(panel) {
       </table>
     </section>
   `;
-  $("#sync-stats").addEventListener("click", async () => {
-    await publishMyStats();
-    await refreshTeam();
-    renderTeam($("#main"));
-    toast("Your record is up to date.");
-  });
+  $("#sync-stats").addEventListener("click", (e) =>
+    runBtn(e.currentTarget, "Syncing…", async () => {
+      await publishMyStats();
+      await refreshTeam();
+      renderTeam($("#main"));
+      toast("Your record is up to date.");
+    })
+  );
   $$("[data-kick]", panel).forEach((b) =>
     b.addEventListener("click", () => confirmTeamAction(
       "Remove member", "Remove this blader from the team?",
@@ -1140,8 +1191,7 @@ function battleForm(existing) {
     { name: "notes", label: "Notes", type: "textarea" },
   ], existing || {});
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     const clean = lineup.filter((l) => (l.player || "").trim() || l.result);
     const data = {
@@ -1217,8 +1267,7 @@ function teamEventForm(existing) {
     { name: "roster", label: "Roster (names)", placeholder: "Bird, Rin, Ohtori" },
     { name: "notes", label: "Notes", type: "textarea" },
   ], existing || {});
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     const data = {
       name: v.name.trim(), date: v.date || "", location: v.location.trim(), format: v.format,
@@ -1313,22 +1362,16 @@ function renderTeamJoin(main) {
     </div>
   `;
   $("#create-team").addEventListener("click", () => teamForm());
-  $("#join-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit($("#join-form"), async () => {
     const code = $("#join-code").value;
-    try {
-      const teamId = await teams.joinTeam(code, displayName());
-      await store.setOne("profile", "main", { teamId });
-      state.profile.teamId = teamId;
-      await publishMyStats();
-      await refreshTeam();
-      state.teamTab = "roster";
-      renderTeam(main);
-      toast("Welcome to the team!");
-    } catch (err) {
-      console.error(err);
-      toast(err.message || "Could not join.", "err");
-    }
+    const teamId = await teams.joinTeam(code, displayName());
+    await store.setOne("profile", "main", { teamId });
+    state.profile.teamId = teamId;
+    await publishMyStats();
+    await refreshTeam();
+    state.teamTab = "roster";
+    renderTeam(main);
+    toast("Welcome to the team!");
   });
 }
 
@@ -1341,8 +1384,7 @@ function teamForm(existing) {
     { name: "color", label: "Accent colour", type: "color", default: "#2b7dff" },
     { name: "bio", label: "Bio", type: "textarea", placeholder: "Who you are, how you roll…" },
   ], existing || {});
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  bindSubmit(form, async () => {
     const v = values();
     const data = {
       name: v.name.trim(), tag: v.tag.trim().toUpperCase().slice(0, 5),
@@ -1379,10 +1421,9 @@ function confirmTeamAction(title, message, run) {
       <button class="btn btn-danger" data-go>Confirm</button>
     </div>`;
   box.querySelector("[data-cancel]").addEventListener("click", modal.close);
-  box.querySelector("[data-go]").addEventListener("click", async () => {
-    try { await run(); modal.close(); }
-    catch (err) { console.error(err); toast(err.message || "Action failed.", "err"); }
-  });
+  box.querySelector("[data-go]").addEventListener("click", (e) =>
+    runBtn(e.currentTarget, "Working…", async () => { await run(); modal.close(); })
+  );
   modal.open(title, box);
 }
 
@@ -1412,17 +1453,15 @@ function confirmDelete(coll, id, noun) {
       <button class="btn btn-danger" data-go>Delete</button>
     </div>`;
   box.querySelector("[data-cancel]").addEventListener("click", modal.close);
-  box.querySelector("[data-go]").addEventListener("click", async () => {
-    try {
+  box.querySelector("[data-go]").addEventListener("click", (e) =>
+    runBtn(e.currentTarget, "Deleting…", async () => {
       await store.remove(coll, id);
       await refresh();
       modal.close();
       render();
       toast(`${noun[0].toUpperCase() + noun.slice(1)} deleted.`);
-    } catch (err) {
-      toast(err.message || "Could not delete.", "err");
-    }
-  });
+    })
+  );
   modal.open(`Delete ${noun}`, box);
 }
 

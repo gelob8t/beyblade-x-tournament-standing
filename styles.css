@@ -114,6 +114,13 @@ h2::before {
 .btn.danger, .btn-ghost.danger { color: var(--loss); }
 .btn.danger:hover { border-color: var(--loss); }
 .btn:disabled { opacity: .45; cursor: not-allowed; filter: none; }
+.btn.is-loading { opacity: 1; cursor: progress; }
+.btn.is-loading > span:last-child { opacity: .85; }
+.btn-spinner {
+  width: 14px; height: 14px; flex: none; display: inline-block;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
 .btn-link {
   background: none; border: none; color: var(--blue); cursor: pointer;
   font: inherit; padding: 0; text-decoration: underline; text-underline-offset: 3px;
