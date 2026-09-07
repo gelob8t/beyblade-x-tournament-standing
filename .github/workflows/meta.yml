@@ -1,0 +1,73 @@
+name: Weekly meta refresh
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Regenerate combo tiers from community votes
+        id: gen
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          npm install --no-save firebase-admin@12
+          node scripts/refresh-meta.mjs
+          if git diff --quiet -- data/meta.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit
+        if: steps.gen.outputs.changed == 'true'
+        run: |
+          git config user.name "meta-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/meta.json
+          git commit -m "chore(meta): weekly community-vote refresh"
+          git push
+
+      # Redeploy the site so the fresh data/meta.json goes live (a push by
+      # the built-in token does not trigger the deploy workflow on its own).
+      - name: Stamp build id
+        if: steps.gen.outputs.changed == 'true'
+        run: |
+          SHA=$(git rev-parse --short=12 HEAD)
+          sed -i "s|\./styles.css\"|./styles.css?v=$SHA\"|" index.html
+          sed -i "s|\./js/app.js\"|./js/app.js?v=$SHA\"|" index.html
+          sed -i "s|register(\"\./sw.js\")|register(\"./sw.js?v=$SHA\")|" index.html
+          sed -i "s|__BUILD__|$SHA|" sw.js
+          for f in js/*.js; do
+            sed -i -E "s|from \"(\./[A-Za-z0-9_-]+\.js)\"|from \"\1?v=$SHA\"|g" "$f"
+          done
+
+      - uses: actions/configure-pages@v5
+        if: steps.gen.outputs.changed == 'true'
+      - uses: actions/upload-pages-artifact@v3
+        if: steps.gen.outputs.changed == 'true'
+        with:
+          path: .
+      - id: deployment
+        if: steps.gen.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4

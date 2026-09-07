@@ -265,6 +265,10 @@ textarea { resize: vertical; }
 }
 .tier-btn:hover { border-color: var(--blue); color: var(--text); }
 .tier-btn.is-mine { background: var(--split); border-color: transparent; color: #fff; }
+.trend { font-size: .75rem; font-weight: 700; flex: none; }
+.trend--up { color: var(--win); }
+.trend--down { color: var(--loss); }
+.trend--new { color: var(--gold); }
 
 /* ---------- achievements ---------- */
 .achv-row { display: flex; flex-wrap: wrap; gap: .4rem; }

@@ -20,7 +20,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Friends activity** | Dashboard feed of friends' recent matches / placements — shown only for friends who set their activity to **Public** (Edit profile → Match activity visibility; default Private) |
 | **Live scoring** | Full-screen, big-button mode to score a match at the table — tap who won each game, pick the finish, first to 4 points, save straight to Matches |
 | **Achievements** | 19 badges from your data (milestones, streaks, finishes, collection, social); progress bars on locked ones; unlock toast; count shown on your profile card |
-| **Meta** | Curated Beyblade X tier list (`data/meta.json`) for blades / ratchets / bits / combos, plus a **community layer**: signed-in users rate combos S–D and the app aggregates the votes into a live consensus. Flags which meta parts you own; one-tap "+ Deck". |
+| **Meta** | Editor-curated tier list (`data/meta.json`) for blades / ratchets / bits, plus a **self-updating combo list**: users rate combos S–D, a live consensus shows between refreshes, and a **weekly job** (`.github/workflows/meta.yml`, Mondays) re-derives each combo's official tier from the votes with ▲/▼/★ movement. Flags which meta parts you own; one-tap "+ Deck". |
 
 Works **offline** (IndexedDB cache): reads come from the local cache, writes queue
 and sync when you reconnect. Deletes are instant with a 6-second **Undo**.
@@ -49,6 +49,18 @@ Team data (roster, battles, events) is shared with everyone on that team.
 > locally once, then add the printed token as a repo secret named `FIREBASE_TOKEN`
 > (Settings → Secrets and variables → Actions). The deploy workflow then publishes
 > `firestore.rules` on every push; without the secret it just prints a reminder.
+
+### 2b. (Optional) Weekly meta refresh
+
+The **Meta** tab's combo tiers are re-derived from community votes every Monday by
+[`.github/workflows/meta.yml`](.github/workflows/meta.yml). To enable it:
+
+1. Firebase console → ⚙ **Project settings → Service accounts → Generate new private key** — this downloads a JSON key.
+2. That key's service account needs read access to Firestore: in the **Google Cloud console → IAM**, give it the **Cloud Datastore Viewer** role (Firebase usually grants enough by default).
+3. Paste the whole JSON as a repo secret named **`GCP_SA_KEY`**.
+
+Without the secret the workflow just logs a skip message; the live community
+ratings on the Meta tab still work either way.
 
 ### 3. Add your config to the app
 

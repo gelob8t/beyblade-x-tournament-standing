@@ -1760,16 +1760,25 @@ async function loadMeta() {
   const byKey = new Map();
   for (const c of curated.combos || []) {
     const key = meta.comboKey(c.blade, c.ratchet, c.bit);
-    byKey.set(key, { key, blade: c.blade, ratchet: c.ratchet, bit: c.bit, role: c.role || "", curatedTier: c.tier || null, curatedNote: c.note || "", tally: {}, count: 0 });
+    byKey.set(key, {
+      key, blade: c.blade, ratchet: c.ratchet, bit: c.bit, role: c.role || "",
+      officialTier: c.tier || null, trend: c.trend || null, note: c.note || "",
+      tally: {}, count: 0,
+    });
   }
   for (const c of community) {
     const cur = byKey.get(c.key);
     if (cur) { cur.tally = c.tally || {}; cur.count = c.count || 0; }
-    else byKey.set(c.key, { key: c.key, blade: c.blade, ratchet: c.ratchet, bit: c.bit, role: c.role || "", curatedTier: null, curatedNote: "", tally: c.tally || {}, count: c.count || 0, addedByName: c.addedByName });
+    else byKey.set(c.key, {
+      key: c.key, blade: c.blade, ratchet: c.ratchet, bit: c.bit, role: c.role || "",
+      officialTier: null, trend: "new", note: "",
+      tally: c.tally || {}, count: c.count || 0, addedByName: c.addedByName,
+    });
   }
 
   state.meta = {
     updated: curated.updated,
+    refreshedAt: curated.refreshedAt || null,
     note: curated.note,
     roles: curated.roles || ["Attack", "Stamina", "Defense", "Balance"],
     blades: curated.blades || [],
@@ -1801,7 +1810,8 @@ function renderMeta(main) {
       <h1>Meta</h1>
       <button class="btn btn-primary" id="add-combo">+ Add combo</button>
     </div>
-    <p class="muted small">${esc(m.note)} <b>Snapshot: ${esc(m.updated)}.</b></p>
+    <p class="muted small">${esc(m.note)}
+      <b>${m.refreshedAt ? `Combos refreshed weekly — last: ${fmtDate((m.refreshedAt || "").slice(0, 10))}.` : `Snapshot: ${esc(m.updated)}.`}</b></p>
     <div class="seg" id="meta-tabs">
       ${tabs.map(([k, l]) => `<button class="seg-btn${state.metaTab === k ? " is-active" : ""}" data-mt="${k}">${l}</button>`).join("")}
     </div>
@@ -1818,22 +1828,28 @@ function renderMeta(main) {
   else metaPartsPanel(panel, state.metaTab);
 }
 
+const TREND_MARK = { up: "▲", down: "▼", new: "★", same: "" };
+
+function metaTierRank(c) {
+  return TIER_RANK[c.officialTier] ?? (c.cons.letter ? TIER_RANK[c.cons.letter] : 9);
+}
+
 function metaCombosPanel(panel) {
   const rows = [...state.meta.combos];
   const sort = state.metaSort;
   rows.sort((a, b) => {
-    if (sort === "curated") return (TIER_RANK[a.curatedTier] ?? 9) - (TIER_RANK[b.curatedTier] ?? 9) || b.cons.score - a.cons.score;
+    if (sort === "tier") return metaTierRank(a) - metaTierRank(b) || b.cons.score - a.cons.score;
     if (sort === "votes") return b.cons.count - a.cons.count;
-    if (sort === "owned") return b.owned - a.owned || b.cons.score - a.cons.score;
-    return (b.cons.score || (b.curatedTier ? 5 - TIER_RANK[b.curatedTier] : 0)) - (a.cons.score || (a.curatedTier ? 5 - TIER_RANK[a.curatedTier] : 0));
+    if (sort === "owned") return b.owned - a.owned || metaTierRank(a) - metaTierRank(b);
+    return b.cons.score - a.cons.score || metaTierRank(a) - metaTierRank(b);
   });
 
   panel.innerHTML = `
     <div class="filter-bar">
       <label class="muted small">Sort</label>
       <select id="meta-sort">
-        <option value="community"${sort === "community" ? " selected" : ""}>Community rating</option>
-        <option value="curated"${sort === "curated" ? " selected" : ""}>Editor tier</option>
+        <option value="community"${sort === "community" ? " selected" : ""}>Live community rating</option>
+        <option value="tier"${sort === "tier" ? " selected" : ""}>This week's tier</option>
         <option value="votes"${sort === "votes" ? " selected" : ""}>Most votes</option>
         <option value="owned"${sort === "owned" ? " selected" : ""}>Parts I own</option>
       </select>
@@ -1841,18 +1857,20 @@ function metaCombosPanel(panel) {
     <div class="card-list">
       ${rows.map((c) => {
         const mine = state.myVotes[c.key];
+        const trend = TREND_MARK[c.trend] || "";
         return `<article class="card meta-combo">
           <div class="card-main">
             <div class="match-top">
-              ${c.curatedTier ? `<span class="tier tier--${c.curatedTier}">${c.curatedTier}</span>` : ""}
+              ${c.officialTier ? `<span class="tier tier--${c.officialTier}">${c.officialTier}</span>` : ""}
+              ${trend ? `<span class="trend trend--${c.trend}" title="${c.trend === "up" ? "moved up this week" : c.trend === "down" ? "moved down this week" : "new this week"}">${trend}</span>` : ""}
               <h3>${esc([c.blade, c.ratchet, c.bit].filter(Boolean).join(" "))}</h3>
             </div>
             <div class="chips">
               ${c.role ? `<span class="chip">${esc(c.role)}</span>` : ""}
-              ${c.cons.letter ? `<span class="chip chip--accent">Community ${c.cons.letter} · ${c.cons.score.toFixed(1)} (${c.cons.count})</span>` : `<span class="chip">Unrated</span>`}
+              ${c.cons.letter ? `<span class="chip chip--accent">Live ${c.cons.letter} · ${c.cons.score.toFixed(1)} (${c.cons.count})</span>` : `<span class="chip">Unrated</span>`}
               <span class="chip${c.owned === 3 ? " chip--accent" : ""}">Own ${c.owned}/3</span>
             </div>
-            ${c.curatedNote ? `<p class="card-notes">${esc(c.curatedNote)}</p>` : ""}
+            ${c.note ? `<p class="card-notes">${esc(c.note)}</p>` : ""}
             <div class="tier-vote" data-key="${esc(c.key)}">
               <span class="muted small">Your rating:</span>
               ${meta.TIERS.map((t) => `<button class="tier-btn${mine === t ? " is-mine" : ""}" data-tier="${t}">${t}</button>`).join("")}
