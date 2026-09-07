@@ -507,9 +507,10 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
   .profile-btn-name { display: none; }
   .topbar-user { flex: none; }
 
-  /* nav becomes a single scrollable strip */
+  /* nav becomes a single scrollable strip on its own row */
   .tabs {
     order: 3;
+    flex: 1 1 100%;
     width: 100%;
     flex-wrap: nowrap;
     overflow-x: auto;
