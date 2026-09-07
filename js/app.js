@@ -208,6 +208,8 @@ const state = {
   friendReqOut: [],
   friendCards: {},
   feed: [],
+  openFriend: null,
+  friendProfile: null,
   loaded: false,
 };
 
@@ -340,6 +342,8 @@ async function publishPresence() {
       photo,
       region: state.profile.region || "",
       teamName: state.team ? state.team.name : "",
+      mainBey: state.profile.mainBey || "",
+      bio: state.profile.bio || "",
       feedVisibility: state.profile.feedVisibility === "public" ? "public" : "private",
       stats,
     });
@@ -653,13 +657,30 @@ function exportData() {
 
 function switchView(view) {
   state.view = view;
+  state.openFriend = null;
   $$("#tabs .tab").forEach((t) => t.classList.toggle("is-active", t.dataset.view === view));
   render();
+}
+
+async function openFriendProfile(uid) {
+  state.view = "friends";
+  state.openFriend = uid;
+  state.friendProfile = { uid, loading: true };
+  $$("#tabs .tab").forEach((t) => t.classList.toggle("is-active", t.dataset.view === "friends"));
+  render();
+  try {
+    state.friendProfile = { ...(await friends.getProfile(uid)), loading: false };
+  } catch (err) {
+    console.error(err);
+    state.friendProfile = { uid, card: null, items: null, loading: false };
+  }
+  if (state.openFriend === uid) render();
 }
 
 function render() {
   const main = $("#main");
   if (!state.loaded) { main.innerHTML = `<div class="empty">Loading your data…</div>`; return; }
+  if (state.view === "friends" && state.openFriend) return renderFriendProfile(main);
   ({
     dashboard: renderDashboard,
     tournaments: renderTournaments,
@@ -784,6 +805,17 @@ function renderDashboard(main) {
       </div>
     </section>`}
   `;
+  wireFeedClicks(main);
+}
+
+function wireFeedClicks(root) {
+  $$("[data-open-friend]", root).forEach((el) => {
+    const uid = el.dataset.openFriend;
+    if (!uid) return;
+    const go = () => openFriendProfile(uid);
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
 }
 
 function statCard(label, value, sub) {
@@ -811,7 +843,7 @@ function feedItem(x) {
   const badge = x.kind === "match"
     ? `<span class="result-badge result-badge--${x.result === "W" ? "w" : "l"}">${x.result}</span>`
     : `<span class="result-badge result-badge--x">${x.placement ? ordinal(x.placement) : "—"}</span>`;
-  return `<li class="feed-item">
+  return `<li class="feed-item is-clickable" data-open-friend="${esc(x.ownerUid || "")}" role="button" tabindex="0">
     ${avatarHtml(x.actorName, x.actorPhoto, "avatar--sm")}
     <div class="feed-body">
       <div class="feed-text">${feedText(x)}</div>
@@ -1798,7 +1830,7 @@ function renderFriends(main) {
           const s = c.stats || {};
           const w = Number(s.matchW || 0), l = Number(s.matchL || 0);
           const rate = Math.round(friendRate(s) * 100);
-          return `<article class="friend-card">
+          return `<article class="friend-card is-clickable" data-open-friend="${esc(r.otherUid)}" role="button" tabindex="0">
             ${avatarHtml(c.bladerName, c.photo, "avatar--lg")}
             <div class="friend-main">
               <div class="friend-name">${esc(c.bladerName || "Blader")}</div>
@@ -1862,16 +1894,104 @@ function renderFriends(main) {
     }))
   );
   $$("[data-unfriend]", main).forEach((b) =>
-    b.addEventListener("click", () => confirmTeamAction(
-      "Remove friend", "Remove this blader from your friends?",
-      async () => {
-        await friends.removeFriend(b.dataset.unfriend);
-        await refreshFriends();
-        renderFriends(main);
-        toast("Friend removed.");
-      }
-    ))
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmTeamAction(
+        "Remove friend", "Remove this blader from your friends?",
+        async () => {
+          await friends.removeFriend(b.dataset.unfriend);
+          await refreshFriends();
+          renderFriends(main);
+          toast("Friend removed.");
+        }
+      );
+    })
   );
+  wireFeedClicks(main);
+}
+
+// ---------------------------------------------------------------------------
+// Friend profile
+// ---------------------------------------------------------------------------
+function renderFriendProfile(main) {
+  const p = state.friendProfile;
+  const uid = state.openFriend;
+  const back = `<button class="btn btn-ghost btn-sm" id="friend-back">← Friends</button>`;
+
+  if (!p || p.loading || p.uid !== uid) {
+    main.innerHTML = `<div class="view-head">${back}<h1>Profile</h1></div><div class="empty">Loading…</div>`;
+    $("#friend-back").addEventListener("click", () => { state.openFriend = null; render(); });
+    return;
+  }
+
+  const c = p.card;
+  if (!c) {
+    main.innerHTML = `<div class="view-head">${back}<h1>Profile</h1></div>
+      <div class="empty">Couldn't load this blader's profile.</div>`;
+    $("#friend-back").addEventListener("click", () => { state.openFriend = null; render(); });
+    return;
+  }
+
+  const s = c.stats || {};
+  const mw = Number(s.matchW || 0), ml = Number(s.matchL || 0);
+  const gw = Number(s.gameW || 0), gl = Number(s.gameL || 0);
+  const mRate = mw + ml ? Math.round((mw / (mw + ml)) * 100) : 0;
+  const gRate = gw + gl ? Math.round((gw / (gw + gl)) * 100) : 0;
+  const meta = [c.region, c.teamName].filter(Boolean).join(" · ");
+  const items = p.items;
+
+  main.innerHTML = `
+    <div class="view-head">${back}<h1>${esc(c.bladerName || "Blader")}</h1></div>
+
+    <div class="identity">
+      ${avatarHtml(c.bladerName, c.photo, "avatar--lg")}
+      <div>
+        <div class="identity-name">${esc(c.bladerName || "Blader")}</div>
+        <div class="identity-meta">${esc(meta || "—")}</div>
+      </div>
+      ${c.mainBey ? `<div class="identity-main"><span>Main Bey</span><b>${esc(c.mainBey)}</b></div>` : ""}
+    </div>
+
+    ${c.bio ? `<section class="panel"><p class="card-notes" style="margin:0">${esc(c.bio)}</p></section>` : ""}
+
+    <div class="stat-grid">
+      ${statCard("Match win rate", mRate + "%", `${mw}W – ${ml}L`)}
+      ${statCard("Game win rate", gRate + "%", `${gw}W – ${gl}L games`)}
+      ${statCard("Tournaments", Number(s.tournaments || 0), s.bestPlacement ? `Best finish: ${ordinal(s.bestPlacement)}` : "No placements")}
+    </div>
+
+    <section class="panel">
+      <h2>Match history</h2>
+      ${items == null
+        ? `<p class="muted">🔒 ${esc(c.bladerName || "This blader")} keeps their match history private.</p>`
+        : items.length === 0
+          ? `<p class="muted">No matches shared yet.</p>`
+          : `<ul class="feed">${items.map(historyItem).join("")}</ul>`}
+    </section>
+  `;
+  $("#friend-back").addEventListener("click", () => { state.openFriend = null; render(); });
+}
+
+function historyItem(x) {
+  if (x.kind === "tournament") {
+    const rec = (x.wins != null || x.losses != null) ? ` · ${Number(x.wins || 0)}–${Number(x.losses || 0)}` : "";
+    return `<li class="feed-item">
+      <span class="result-badge result-badge--x">${x.placement ? ordinal(x.placement) : "—"}</span>
+      <div class="feed-body">
+        <div class="feed-text">${esc(ordinal(x.placement || 0))} at ${esc(x.name || "a tournament")}<span class="muted">${esc(rec)}</span></div>
+        <div class="muted small">${x.at ? fmtDate(x.at) : esc(relTime(x.createdAt))}</div>
+      </div>
+    </li>`;
+  }
+  const score = (x.myScore || x.oppScore) ? ` ${x.myScore}–${x.oppScore}` : "";
+  const deck = x.deck ? ` <span class="muted">· ${esc(x.deck)}</span>` : "";
+  return `<li class="feed-item">
+    <span class="result-badge result-badge--${x.result === "W" ? "w" : "l"}">${x.result}</span>
+    <div class="feed-body">
+      <div class="feed-text">${x.result === "W" ? "Beat" : "Lost to"} ${esc(x.opponent || "someone")}${score}${deck}</div>
+      <div class="muted small">${x.at ? fmtDate(x.at) : esc(relTime(x.createdAt))}</div>
+    </div>
+  </li>`;
 }
 
 // ---------------------------------------------------------------------------

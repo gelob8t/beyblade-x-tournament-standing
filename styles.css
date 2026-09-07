@@ -493,6 +493,12 @@ textarea { resize: vertical; }
   padding: .6rem .2rem; border-bottom: 1px solid var(--bg-2);
 }
 .feed-item:last-child { border-bottom: none; }
+.is-clickable { cursor: pointer; }
+.feed-item.is-clickable { border-radius: 4px; transition: background .12s ease; }
+.feed-item.is-clickable:hover { background: var(--panel-2); }
+.friend-card.is-clickable { transition: border-color .15s ease, background .12s ease; }
+.friend-card.is-clickable:hover { border-left-color: var(--blue); background: var(--panel); }
+.friend-card [data-unfriend] { align-self: flex-start; }
 .feed-body { flex: 1; min-width: 0; }
 .feed-text { font-size: .9rem; line-height: 1.35; }
 .feed-text b { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; }

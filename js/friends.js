@@ -145,3 +145,15 @@ export async function listActivity(ownerUid, max = 8) {
   );
   return snap.docs.map((d) => ({ id: d.id, ownerUid, ...d.data() }));
 }
+
+/** A friend's public card + their match history (null history = kept private). */
+export async function getProfile(u, maxItems = 50) {
+  const card = await getCard(u);
+  let items = null;
+  try {
+    items = await listActivity(u, maxItems);
+  } catch (_) {
+    items = null; // feed is private, or not allowed
+  }
+  return { uid: u, card, items };
+}
