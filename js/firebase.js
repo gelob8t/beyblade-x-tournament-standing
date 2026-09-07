@@ -10,6 +10,9 @@ import {
   sendPasswordResetEmail,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore,
   collection,
   collectionGroup,
@@ -28,6 +31,8 @@ import {
   arrayRemove,
   serverTimestamp,
   writeBatch,
+  waitForPendingWrites,
+  onSnapshotsInSync,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { firebaseConfig, isConfigured } from "./firebase-config.js";
@@ -39,7 +44,15 @@ let db = null;
 if (isConfigured) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+  // IndexedDB-backed cache: reads work offline, writes queue and sync later.
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch (e) {
+    console.warn("persistent cache unavailable, falling back", e);
+    db = getFirestore(app);
+  }
 }
 
 export {
@@ -72,4 +85,6 @@ export {
   arrayRemove,
   serverTimestamp,
   writeBatch,
+  waitForPendingWrites,
+  onSnapshotsInSync,
 };

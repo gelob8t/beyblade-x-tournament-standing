@@ -32,6 +32,11 @@ export async function list(name, sortField = "createdAt") {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/** Client-generated id for a new document in a collection. */
+export function newId(name) {
+  return doc(col(name)).id;
+}
+
 /** Create a document, stamping createdAt/updatedAt. */
 export async function create(name, data) {
   const ref = await addDoc(col(name), {
@@ -40,6 +45,15 @@ export async function create(name, data) {
     updatedAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+/** Create a document at a known id (for optimistic writes and undo/restore). */
+export function createAt(name, id, data) {
+  return setDoc(doc(db, "users", uid(), name, id), {
+    ...data,
+    createdAt: data.createdAt || serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
 }
 
 /** Create many documents in one batched write (max 500). */

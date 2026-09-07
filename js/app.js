@@ -1,12 +1,14 @@
 import {
   isConfigured,
   auth,
+  db,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
   sendPasswordResetEmail,
+  waitForPendingWrites,
 } from "./firebase.js";
 import * as store from "./store.js";
 import * as teams from "./teams.js";
@@ -42,6 +44,18 @@ function toast(msg, kind = "ok") {
   t.hidden = false;
   clearTimeout(toast._t);
   toast._t = setTimeout(() => (t.hidden = true), 2800);
+}
+
+/** Toast with an Undo action; stays up ~6s. */
+function undoToast(msg, onUndo) {
+  const t = $("#toast");
+  clearTimeout(toast._t);
+  t.className = "toast toast--warn toast--action";
+  t.innerHTML = `<span>${esc(msg)}</span><button type="button" class="toast-undo">Undo</button>`;
+  t.hidden = false;
+  const close = () => { t.hidden = true; t.innerHTML = ""; t.className = "toast"; };
+  t.querySelector(".toast-undo").addEventListener("click", () => { close(); onUndo(); });
+  toast._t = setTimeout(close, 6000);
 }
 
 
@@ -512,6 +526,27 @@ function initShell() {
     t.addEventListener("click", () => switchView(t.dataset.view))
   );
   initProfileMenu();
+  initNet();
+}
+
+function initNet() {
+  const banner = $("#net-banner");
+  const update = () => {
+    const off = !navigator.onLine;
+    banner.hidden = !off;
+    banner.textContent = off
+      ? "Offline — changes are saved on this device and sync when you reconnect."
+      : "";
+  };
+  addEventListener("online", async () => {
+    update();
+    try {
+      await waitForPendingWrites(db);
+      if (state.loaded) { await refresh(); render(); }
+    } catch { /* ignore */ }
+  });
+  addEventListener("offline", update);
+  update();
 }
 
 // ---------------------------------------------------------------------------
@@ -1101,6 +1136,7 @@ function renderMatches(main) {
       <h1>Matches</h1>
       <div class="head-actions">
         ${last ? `<button class="btn btn-ghost" id="repeat-match">Repeat last</button>` : ""}
+        <button class="btn btn-ghost" id="live-score">⚡ Score live</button>
         <button class="btn btn-primary" id="add-match">+ Log match</button>
       </div>
     </div>
@@ -1148,6 +1184,7 @@ function renderMatches(main) {
     </div>`}
   `;
   $("#add-match").addEventListener("click", () => matchForm());
+  $("#live-score").addEventListener("click", () => liveScoring(last));
   const rep = $("#repeat-match");
   if (rep) rep.addEventListener("click", () => matchForm(null, last));
   $$("[data-edit]", main).forEach((b) =>
@@ -1253,6 +1290,177 @@ function matchForm(existing, template) {
     await save("matches", existing, data);
   });
   modal.open(existing ? "Edit match" : template ? "Log match (repeat)" : "Log match", form);
+}
+
+// ---------------------------------------------------------------------------
+// Live scoring — full-screen, big-button, score a match at the table
+// ---------------------------------------------------------------------------
+const TARGET_POINTS = 4;
+
+function liveScoring(template) {
+  const s = {
+    opponent: "",
+    myDeck: template?.myDeck || "",
+    tournamentId: template?.tournamentId || "",
+    games: [],
+  };
+
+  const root = document.createElement("div");
+  root.className = "live";
+  document.body.append(root);
+  document.body.style.overflow = "hidden";
+  const close = () => { root.remove(); document.body.style.overflow = ""; };
+
+  const points = () => {
+    let me = 0, opp = 0;
+    for (const g of s.games) (g.winner === "me" ? (me += finishPts(g.finish)) : (opp += finishPts(g.finish)));
+    return { me, opp };
+  };
+  const done = () => {
+    if (s.forceOpen) return false;
+    const p = points();
+    return p.me >= TARGET_POINTS || p.opp >= TARGET_POINTS;
+  };
+
+  const setup = () => {
+    root.innerHTML = `
+      <div class="live-inner">
+        <div class="live-top"><h2>Score a match</h2><button class="btn btn-ghost btn-sm" data-x>Close</button></div>
+        <form class="entry-form" id="live-setup">
+          <label class="field"><span>Opponent</span><input id="l-opp" required placeholder="Blader name" autocomplete="off" /></label>
+          <label class="field"><span>My deck</span>
+            <select id="l-deck">
+              <option value="">— none —</option>
+              ${state.decks.map((d) => `<option value="${esc(d.name)}"${s.myDeck === d.name ? " selected" : ""}>${esc(d.name)}</option>`).join("")}
+            </select>
+          </label>
+          <label class="field"><span>Tournament</span>
+            <select id="l-tourney">
+              <option value="">— casual —</option>
+              ${state.tournaments.map((t) => `<option value="${esc(t.id)}"${s.tournamentId === t.id ? " selected" : ""}>${esc(t.name || "Untitled")}</option>`).join("")}
+            </select>
+          </label>
+          <div class="form-actions">
+            <button type="button" class="btn btn-ghost" data-x>Cancel</button>
+            <button class="btn btn-primary">Start scoring</button>
+          </div>
+        </form>
+      </div>`;
+    root.querySelectorAll("[data-x]").forEach((b) => b.addEventListener("click", close));
+    root.querySelector("#live-setup").addEventListener("submit", (e) => {
+      e.preventDefault();
+      s.opponent = root.querySelector("#l-opp").value.trim();
+      s.myDeck = root.querySelector("#l-deck").value;
+      s.tournamentId = root.querySelector("#l-tourney").value;
+      board();
+    });
+  };
+
+  const board = () => {
+    const p = points();
+    const finished = done();
+    const res = p.me === p.opp ? "—" : p.me > p.opp ? "W" : "L";
+    root.innerHTML = `
+      <div class="live-inner live-board">
+        <div class="live-top">
+          <span class="muted">${esc(s.opponent || "Opponent")}${s.myDeck ? " · " + esc(s.myDeck) : ""}</span>
+          <button class="btn btn-ghost btn-sm" data-x>Close</button>
+        </div>
+
+        <div class="live-score">
+          <div class="live-side live-side--me"><span>YOU</span><b>${p.me}</b></div>
+          <span class="live-dash">–</span>
+          <div class="live-side live-side--opp"><span>OPP</span><b>${p.opp}</b></div>
+        </div>
+
+        ${finished
+          ? `<div class="live-result live-result--${res === "W" ? "w" : "l"}">
+              ${res === "W" ? "You win" : res === "L" ? "You lose" : "Tied"} ${p.me}–${p.opp}
+             </div>
+             <div class="live-actions">
+               <button class="btn btn-primary btn-block" data-save>Save match</button>
+               <button class="btn btn-ghost btn-block" data-continue>Keep scoring</button>
+               <button class="btn btn-ghost btn-block danger" data-x>Discard</button>
+             </div>`
+          : `<p class="live-hint">First to ${TARGET_POINTS} points. Tap who won each game.</p>
+             <div class="live-zones">
+               <button class="live-zone live-zone--me" data-win="me">I won a game</button>
+               <button class="live-zone live-zone--opp" data-win="opp">Opponent won</button>
+             </div>
+             ${(p.me >= TARGET_POINTS || p.opp >= TARGET_POINTS) ? `<button class="btn btn-primary btn-block" data-finish>Finish &amp; review</button>` : ""}`}
+
+        ${s.games.length ? `<div class="live-games">
+          ${s.games.map((g, i) => `<button class="live-game live-game--${g.winner === "me" ? "me" : "opp"}" data-undo="${i}" title="Tap to remove">
+            ${g.winner === "me" ? "You" : "Opp"} · ${esc(finishLabel(g.finish))} +${finishPts(g.finish)}
+          </button>`).join("")}
+        </div>` : ""}
+      </div>`;
+
+    root.querySelectorAll("[data-x]").forEach((b) => b.addEventListener("click", close));
+    root.querySelectorAll("[data-win]").forEach((b) =>
+      b.addEventListener("click", () => finishPicker(b.dataset.win))
+    );
+    root.querySelectorAll("[data-undo]").forEach((b) =>
+      b.addEventListener("click", () => { s.games.splice(Number(b.dataset.undo), 1); board(); })
+    );
+    const cont = root.querySelector("[data-continue]");
+    if (cont) cont.addEventListener("click", () => { s.forceOpen = true; board(); });
+    const fin = root.querySelector("[data-finish]");
+    if (fin) fin.addEventListener("click", () => { s.forceOpen = false; board(); });
+    const saveBtn = root.querySelector("[data-save]");
+    if (saveBtn) saveBtn.addEventListener("click", (e) => runBtn(e.currentTarget, "Saving…", async () => {
+      await save_(); close();
+    }));
+  };
+
+  const finishPicker = (winner) => {
+    const sheet = document.createElement("div");
+    sheet.className = "live-picker";
+    sheet.innerHTML = `
+      <div class="live-picker-card">
+        <h3>${winner === "me" ? "You won" : "Opponent won"} — how?</h3>
+        <div class="live-picker-grid">
+          ${FINISHES.map((f) => `<button class="btn btn-ghost" data-f="${f.key}">${f.label}<br><span class="muted">+${f.pts}</span></button>`).join("")}
+          <button class="btn btn-ghost danger" data-cancel>Cancel</button>
+        </div>
+      </div>`;
+    root.append(sheet);
+    sheet.querySelector("[data-cancel]").addEventListener("click", () => sheet.remove());
+    sheet.querySelectorAll("[data-f]").forEach((b) =>
+      b.addEventListener("click", () => {
+        s.games.push({ winner, finish: b.dataset.f });
+        sheet.remove();
+        board();
+      })
+    );
+  };
+
+  const save_ = async () => {
+    const data = {
+      date: today(),
+      tournamentId: s.tournamentId || null,
+      opponent: s.opponent.trim(),
+      myDeck: s.myDeck || "",
+      opponentDeck: "",
+      games: s.games.map((g) => ({ winner: g.winner, finish: g.finish })),
+      result: "",
+      notes: "",
+    };
+    const id = store.newId("matches");
+    try {
+      await commit(store.createAt("matches", id, data));
+    } catch (err) {
+      toast(err.message || "Could not save.", "err");
+      return;
+    }
+    patchLocalDoc("matches", id, data, true);
+    postActivity("matches", id, data);
+    publishPresence();
+    if (state.view === "matches") render();
+    toast("Match saved.");
+  };
+
+  setup();
 }
 
 // ---------------------------------------------------------------------------
@@ -2167,20 +2375,63 @@ function historyItem(x) {
 // ---------------------------------------------------------------------------
 // Shared save / delete
 // ---------------------------------------------------------------------------
+
+/** Race a Firestore write against a short timeout. Resolves "online" if it
+ *  lands quickly, "queued" if it's still pending (offline / very slow).
+ *  Rejects if the write fails fast (e.g. permission denied). */
+function commit(promise) {
+  return Promise.race([
+    promise.then(() => "online"),
+    new Promise((res) => setTimeout(() => res("queued"), 1500)),
+  ]);
+}
+
+const STATE_KEY = { tournaments: "tournaments", matches: "matches", beys: "beys", decks: "decks" };
+
+/** Optimistically reflect a write in local state so the UI updates instantly. */
+function patchLocalDoc(coll, id, data, isNew) {
+  const key = STATE_KEY[coll];
+  if (!key) return;
+  const arr = state[key];
+  const now = new Date();
+  if (isNew) {
+    arr.unshift({ id, ...data, createdAt: now, updatedAt: now });
+  } else {
+    const i = arr.findIndex((x) => x.id === id);
+    if (i >= 0) arr[i] = { ...arr[i], ...data, updatedAt: now };
+  }
+}
+
+function removeLocalDoc(coll, id) {
+  const key = STATE_KEY[coll];
+  if (key) state[key] = state[key].filter((x) => x.id !== id);
+}
+
 async function save(coll, existing, data) {
+  const isNew = !existing;
+  const id = existing?.id || store.newId(coll);
+  const write = isNew ? store.createAt(coll, id, data) : store.update(coll, id, data);
+
+  let status;
   try {
-    let id = existing?.id;
-    if (existing) await store.update(coll, existing.id, data);
-    else id = await store.create(coll, data);
-    if (!existing) await postActivity(coll, id, data);
-    await refresh();  // refresh() re-publishes the player card + team stats
-    modal.close();
-    render();
-    toast("Saved.");
+    status = await commit(write);
   } catch (err) {
     console.error(err);
     toast(err.message || "Could not save.", "err");
+    return;
   }
+
+  patchLocalDoc(coll, id, data, isNew);
+  if (isNew) postActivity(coll, id, data);
+  publishPresence();
+  modal.close();
+  render();
+  toast(status === "online" ? "Saved." : "Saved — will sync when you're online.", status === "online" ? "ok" : "warn");
+
+  // reconcile with the server once the write settles (server timestamps, etc.)
+  write
+    .then(() => refresh().then(render))
+    .catch((err) => toast("A change didn't sync: " + (err.message || err), "err"));
 }
 
 /** Add a feed item when a new match / placed tournament is logged. Best-effort. */
@@ -2213,27 +2464,43 @@ async function postActivity(coll, srcId, data) {
   }
 }
 
+/** Delete a user-owned doc immediately, with a 6s Undo toast. */
 function confirmDelete(coll, id, noun) {
-  const box = document.createElement("div");
-  box.innerHTML = `<p>Delete this ${noun}? This can't be undone.</p>
-    <div class="form-actions">
-      <button class="btn btn-ghost" data-cancel>Cancel</button>
-      <button class="btn btn-danger" data-go>Delete</button>
-    </div>`;
-  box.querySelector("[data-cancel]").addEventListener("click", modal.close);
-  box.querySelector("[data-go]").addEventListener("click", (e) =>
-    runBtn(e.currentTarget, "Deleting…", async () => {
-      await store.remove(coll, id);
-      if (coll === "matches" || coll === "tournaments") {
-        await friends.deleteActivityForSource(id).catch(() => {});
+  const key = STATE_KEY[coll];
+  const item = key ? state[key].find((x) => x.id === id) : null;
+  const Noun = noun[0].toUpperCase() + noun.slice(1);
+
+  removeLocalDoc(coll, id);
+  render();
+
+  const del = store.remove(coll, id);
+  del.catch((err) => toast("Delete failed: " + (err.message || err), "err"));
+
+  let undone = false;
+  const finalize = setTimeout(async () => {
+    if (undone) return;
+    if (coll === "matches" || coll === "tournaments") {
+      await friends.deleteActivityForSource(id).catch(() => {});
+    }
+    publishPresence();
+    refresh().then(render).catch(() => {});
+  }, 6500);
+
+  undoToast(`${Noun} deleted`, async () => {
+    undone = true;
+    clearTimeout(finalize);
+    if (item) {
+      const { id: _i, createdAt, updatedAt, ...rest } = item;
+      try {
+        await store.createAt(coll, id, { ...rest, createdAt });
+        patchLocalDoc(coll, id, rest, true);
+        render();
+        toast(`${Noun} restored.`);
+      } catch (err) {
+        toast("Couldn't restore: " + (err.message || err), "err");
       }
-      await refresh();
-      modal.close();
-      render();
-      toast(`${noun[0].toUpperCase() + noun.slice(1)} deleted.`);
-    })
-  );
-  modal.open(`Delete ${noun}`, box);
+    }
+  });
 }
 
 function today() {

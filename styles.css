@@ -569,6 +569,88 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
 .toast--ok { border-left: 3px solid var(--win); }
 .toast--err { border-left: 3px solid var(--loss); }
 .toast--warn { border-left: 3px solid var(--gold); }
+.toast--action { display: flex; align-items: center; gap: 1rem; }
+.toast-undo {
+  background: none; border: none; color: var(--blue); cursor: pointer;
+  font-family: var(--font-display); font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; font-size: .8rem; padding: .1em .2em;
+}
+
+/* ---------- live scoring ---------- */
+.live {
+  position: fixed; inset: 0; z-index: 120;
+  background: var(--bg); background-image: var(--speedlines);
+  overflow-y: auto;
+}
+.live-inner { max-width: 560px; margin: 0 auto; padding: 1.2rem 1.1rem 3rem; display: grid; gap: 1.1rem; }
+.live-top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.live-top h2 { margin: 0; }
+
+.live-score {
+  display: flex; align-items: center; justify-content: center; gap: 1.2rem;
+  padding: 1.4rem 1rem;
+  background: linear-gradient(115deg, rgba(43,125,255,.14), rgba(255,47,69,.12)), var(--panel);
+  border: 1px solid var(--line);
+  clip-path: polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%);
+}
+.live-side { display: grid; justify-items: center; gap: .1rem; }
+.live-side span { font-family: var(--font-display); font-size: .8rem; letter-spacing: .12em; color: var(--muted); }
+.live-side b { font-family: var(--font-display); font-style: italic; font-size: 3.4rem; line-height: 1; }
+.live-side--me b { color: var(--blue); }
+.live-side--opp b { color: var(--red); }
+.live-dash { font-size: 2rem; color: var(--muted); }
+
+.live-hint { text-align: center; color: var(--muted); margin: 0; }
+.live-zones { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+@media (max-width: 420px) { .live-zones { grid-template-columns: 1fr; } }
+.live-zone {
+  border: none; cursor: pointer; color: #fff;
+  font-family: var(--font-display); font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  font-size: 1rem; padding: 2rem 1rem; min-height: 120px;
+  clip-path: polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);
+  transition: filter .1s ease, transform .06s ease;
+}
+.live-zone:active { transform: scale(.98); }
+.live-zone--me { background: linear-gradient(160deg, #3b88ff, #2360c8); }
+.live-zone--opp { background: linear-gradient(160deg, #ff4b63, #c81f36); }
+
+.live-games { display: flex; flex-wrap: wrap; gap: .4rem; }
+.live-game {
+  border: 1px solid var(--line); background: var(--bg-2); color: var(--text);
+  font-family: var(--font-display); font-size: .78rem; padding: .35em .7em; cursor: pointer;
+  clip-path: polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%);
+}
+.live-game--me { border-color: rgba(43,125,255,.5); }
+.live-game--opp { border-color: rgba(255,47,69,.5); }
+
+.live-result {
+  text-align: center; font-family: var(--font-display); font-weight: 700; font-style: italic;
+  font-size: 1.6rem; letter-spacing: .02em; padding: .6rem;
+}
+.live-result--w { color: var(--win); }
+.live-result--l { color: var(--loss); }
+.live-actions { display: grid; gap: .6rem; }
+
+.live-picker {
+  position: fixed; inset: 0; z-index: 130; display: grid; place-items: end center;
+  background: rgba(3,5,9,.72); backdrop-filter: blur(3px);
+}
+.live-picker-card {
+  width: min(560px, 100%); background: var(--panel); border-top: 3px solid transparent;
+  border-image: var(--split) 1; padding: 1.2rem 1rem 1.6rem;
+}
+.live-picker-card h3 { margin: 0 0 .8rem; text-align: center; }
+.live-picker-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.live-picker-grid .btn { padding: 1rem .6rem; font-size: .9rem; line-height: 1.3; }
+.live-picker-grid .btn:last-child { grid-column: 1 / -1; }
+
+/* ---------- offline banner ---------- */
+.net-banner {
+  position: sticky; top: 0; z-index: 19;
+  padding: .5rem 1rem; text-align: center;
+  font-family: var(--font-display); font-weight: 600; font-size: .82rem; letter-spacing: .02em;
+  color: #0c0f16; background: var(--gold);
+}
 
 /* ---------- responsive ---------- */
 @media (max-width: 768px) {
