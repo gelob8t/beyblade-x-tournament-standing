@@ -14,6 +14,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  writeBatch,
 } from "./firebase.js";
 
 function uid() {
@@ -39,6 +40,20 @@ export async function create(name, data) {
     updatedAt: serverTimestamp(),
   });
   return ref.id;
+}
+
+/** Create many documents in one batched write (max 500). */
+export async function createMany(name, rows) {
+  const batch = writeBatch(db);
+  for (const data of rows) {
+    batch.set(doc(col(name)), {
+      ...data,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+  await batch.commit();
+  return rows.length;
 }
 
 /** Patch an existing document. */

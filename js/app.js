@@ -76,6 +76,19 @@ function buildForm(fields, initial = {}) {
   form.className = "entry-form";
   for (const f of fields) {
     if (f.type === "custom") { form.append(f.render(initial)); continue; }
+    if (f.type === "checkbox") {
+      const wrap = document.createElement("label");
+      wrap.className = "field field--check";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.name = f.name;
+      if (initial[f.name] ?? f.default) cb.checked = true;
+      const span = document.createElement("span");
+      span.textContent = f.label;
+      wrap.append(cb, span);
+      form.append(wrap);
+      continue;
+    }
     const wrap = document.createElement("label");
     wrap.className = "field";
     const val = initial[f.name] ?? f.default ?? "";
@@ -912,7 +925,10 @@ function renderCollection(main) {
   main.innerHTML = `
     <div class="view-head">
       <h1>Collection</h1>
-      <button class="btn btn-primary" id="add-bey">+ Add part</button>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="bulk-bey">Bulk add</button>
+        <button class="btn btn-primary" id="add-bey">+ Add part</button>
+      </div>
     </div>
     ${state.beys.length === 0 ? `<div class="empty">No parts yet. Add your blades, ratchets and bits.</div>` : `
     <div class="collection-grid">
@@ -934,6 +950,7 @@ function renderCollection(main) {
     </div>`}
   `;
   $("#add-bey").addEventListener("click", () => beyForm());
+  $("#bulk-bey").addEventListener("click", () => bulkBeyForm());
   $$("[data-edit]", main).forEach((b) =>
     b.addEventListener("click", () => beyForm(state.beys.find((x) => x.id === b.dataset.edit)))
   );
@@ -953,6 +970,47 @@ function beyForm(existing) {
     await save("beys", existing, { type: v.type, name: v.name.trim(), notes: v.notes.trim() });
   });
   modal.open(existing ? "Edit part" : "Add part", form);
+}
+
+function bulkBeyForm() {
+  const { form, values } = buildForm([
+    { name: "Blade", label: "Blades — one per line", type: "textarea",
+      placeholder: "Dran Sword\nHells Scythe\nWizard Arrow" },
+    { name: "Ratchet", label: "Ratchets — one per line", type: "textarea",
+      placeholder: "3-60\n9-60\n1-60" },
+    { name: "Bit", label: "Bits — one per line", type: "textarea",
+      placeholder: "Flat\nBall\nTaper" },
+    { name: "skipExisting", label: "Skip names already in my collection", type: "checkbox", default: true },
+  ]);
+
+  bindSubmit(form, async () => {
+    const v = values();
+    const skip = v.skipExisting === "on";
+    const have = new Set(state.beys.map((b) => (b.type + "|" + (b.name || "")).toLowerCase()));
+    const seen = new Set();
+    const rows = [];
+    let skipped = 0;
+    for (const type of PART_TYPES) {
+      const lines = (v[type] || "").split("\n").map((s) => s.trim()).filter(Boolean);
+      for (const name of lines) {
+        const key = (type + "|" + name).toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (skip && have.has(key)) { skipped++; continue; }
+        rows.push({ type, name, notes: "" });
+      }
+    }
+    if (!rows.length) {
+      toast(skipped ? "Nothing new to add — those parts are already in your collection." : "Add at least one part name.", "warn");
+      return;
+    }
+    await store.createMany("beys", rows);
+    await refresh();
+    modal.close();
+    render();
+    toast(`Added ${rows.length} part${rows.length === 1 ? "" : "s"}${skipped ? ` · ${skipped} skipped` : ""}.`);
+  });
+  modal.open("Bulk add parts", form);
 }
 
 // ---------------------------------------------------------------------------

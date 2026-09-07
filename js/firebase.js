@@ -27,6 +27,7 @@ import {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
+  writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { firebaseConfig, isConfigured } from "./firebase-config.js";
@@ -70,4 +71,5 @@ export {
   arrayUnion,
   arrayRemove,
   serverTimestamp,
+  writeBatch,
 };

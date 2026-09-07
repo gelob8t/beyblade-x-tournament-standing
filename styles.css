@@ -294,6 +294,7 @@ textarea { resize: vertical; }
 /* ---------- main / identity ---------- */
 .main { max-width: 980px; margin: 0 auto; padding: 1.7rem 1.3rem 4rem; }
 .view-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; flex-wrap: wrap; }
+.head-actions { display: flex; gap: .5rem; }
 .view-head h1 { margin: 0; position: relative; padding-left: .9rem; }
 .view-head h1::before { content: ""; position: absolute; left: 0; top: .1em; bottom: .1em; width: 5px; background: var(--split); clip-path: polygon(0 0,100% 12%,100% 100%,0 88%); }
 
@@ -441,6 +442,9 @@ textarea { resize: vertical; }
 
 .entry-form { display: grid; gap: .95rem; }
 .form-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: .4rem; }
+.field--check { display: flex; align-items: center; gap: .55rem; cursor: pointer; }
+.field--check input { width: auto; flex: none; accent-color: var(--blue); }
+.field--check span { font-size: .9rem; color: var(--text); text-transform: none; letter-spacing: 0; }
 .games-editor, .combo-editor { display: grid; gap: .5rem; padding: .8rem; background: var(--bg-2); border-left: 2px solid var(--blue); }
 .game-edit-row { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: .4rem; }
 .combo-edit-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .4rem; }
@@ -526,7 +530,9 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
   .main { padding: 1.2rem .9rem 3rem; }
   .view-head { gap: .7rem; margin-bottom: 1.1rem; }
   .view-head h1 { font-size: 1.3rem; }
-  .view-head .btn { flex: 1 1 100%; }
+  .view-head > .btn { flex: 1 1 100%; }
+  .view-head .head-actions { flex: 1 1 100%; }
+  .head-actions .btn { flex: 1; }
   .row-between { gap: .6rem; }
   .row-between > .btn { flex: 1 1 100%; }
 
