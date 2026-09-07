@@ -17,12 +17,15 @@ service cloud.firestore {
     // Public card: name, photo, region, team, aggregate record. Any
     // signed-in user can read one; you only write your own.
     match /playerCards/{cardUid} {
-      allow read: if signedIn();
+      allow get: if signedIn();
+      allow list: if false;
       allow write: if signedIn() && cardUid == request.auth.uid;
     }
     match /friendCodes/{code} {
-      allow read, create, delete: if signedIn();
+      allow get, create: if signedIn();
+      allow list: if false;
       allow update: if false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
     match /friendRequests/{reqId} {
       allow read: if signedIn()
@@ -92,7 +95,8 @@ service cloud.firestore {
 
     match /teams/{teamId} {
       // any signed-in user may read basic team info (needed to join by code)
-      allow get, list: if signedIn();
+      allow get: if signedIn();
+      allow list: if false;
 
       allow create: if signedIn()
         && request.resource.data.ownerUid == request.auth.uid

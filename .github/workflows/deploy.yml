@@ -15,10 +15,20 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+
   # Publish the Firestore security rules so they can't drift from the code.
   # Needs a repo secret FIREBASE_TOKEN (run `npx firebase-tools login:ci`
   # locally once and paste the token). Skipped automatically if unset.
   firestore-rules:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +46,7 @@ jobs:
           npx --yes firebase-tools@13 deploy --only firestore:rules --project "$PROJECT" --token "$FIREBASE_TOKEN" --non-interactive
 
   pages:
+    needs: test
     runs-on: ubuntu-latest
     environment:
       name: github-pages
