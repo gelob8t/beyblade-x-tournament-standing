@@ -661,12 +661,12 @@ function renderDashboard(main) {
 
     <section class="panel">
       <h2>Win rate by deck</h2>
-      ${deckRows.length ? `<table class="data-table">
+      ${deckRows.length ? `<div class="table-wrap"><table class="data-table">
         <thead><tr><th>Deck</th><th>Record</th><th>Win rate</th></tr></thead>
         <tbody>${deckRows.map((d) => `
           <tr><td>${esc(d.name)}</td><td>${d.w}–${d.l}</td>
           <td><div class="mini-bar"><span style="width:${Math.round(d.rate * 100)}%"></span></div> ${Math.round(d.rate * 100)}%</td></tr>`).join("")}
-        </tbody></table>` : `<p class="muted">Assign decks to matches to see this.</p>`}
+        </tbody></table></div>` : `<p class="muted">Assign decks to matches to see this.</p>`}
     </section>
 
     <section class="panel">
@@ -1148,7 +1148,7 @@ function teamRoster(panel) {
       <button class="btn btn-ghost btn-sm" id="sync-stats">Sync my record</button>
     </div>
     <section class="panel">
-      <table class="data-table">
+      <div class="table-wrap"><table class="data-table">
         <thead><tr><th>#</th><th>Blader</th><th>Matches</th><th>Win rate</th><th>Games</th><th>Events</th><th>Best</th>${owner ? "<th>Manage</th>" : ""}</tr></thead>
         <tbody>
           ${rows.map((r, i) => `<tr>
@@ -1164,7 +1164,7 @@ function teamRoster(panel) {
               <button class="btn-link danger" data-kick="${r.uid}">remove</button>`}</td>` : ""}
           </tr>`).join("")}
         </tbody>
-      </table>
+      </table></div>
       ${owner ? `<p class="muted small">Editors can change team info and regenerate the invite code. Only you can remove members or delete the team.</p>` : ""}
     </section>
   `;
