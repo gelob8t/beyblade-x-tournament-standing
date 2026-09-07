@@ -146,10 +146,15 @@ export async function deleteTeam(teamId) {
 }
 
 /** Publish the current user's aggregate record so teammates can see it. */
-export async function publishStats(teamId, bladerName, stats) {
+export async function publishStats(teamId, bladerName, stats, photo) {
   await setDoc(
     doc(db, "teams", teamId, "members", uid()),
-    { bladerName: bladerName || "Blader", stats, statsUpdatedAt: serverTimestamp() },
+    {
+      bladerName: bladerName || "Blader",
+      photo: photo || "",
+      stats,
+      statsUpdatedAt: serverTimestamp(),
+    },
     { merge: true }
   );
 }

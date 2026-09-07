@@ -14,7 +14,7 @@ match results, your parts collection, decks, and a stats dashboard. It's a stati
 | **Collection** | Owned Blades, Ratchets and Bits |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
-| **Profile** | Blader name, region, home store, main Bey, bio; JSON export of all your data |
+| **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON export of all your data |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 
 Each account's personal journey is private and syncs across any device you sign in on.
@@ -104,7 +104,9 @@ firestore.rules        security rules to paste into Firebase
 ## Data model
 
 ```
-users/{uid}/profile/main      { bladerName, region, homeStore, mainBey, bio, teamId }
+users/{uid}/profile/main      { bladerName, region, homeStore, mainBey, bio, teamId,
+                                photo }   // photo = 256px JPEG data URL, ~30 KB;
+                                          // resized in the browser, no Firebase Storage needed
 users/{uid}/tournaments/{id}   { name, date, location, format, placement, wins, losses, notes }
 users/{uid}/matches/{id}       { date, tournamentId, opponent, myDeck, opponentDeck,
                                  games: [{ winner: "me"|"opp", finish: "Spin"|"Over"|"Burst"|"Xtreme" }],

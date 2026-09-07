@@ -251,7 +251,20 @@ textarea { resize: vertical; }
   background: var(--split);
   clip-path: polygon(14% 0, 100% 0, 86% 100%, 0 100%);
 }
+.avatar--img { background-size: cover; background-position: center; background-repeat: no-repeat; color: transparent; }
+.avatar--sm { width: 22px; height: 22px; font-size: .62rem; }
 .avatar--lg { width: 44px; height: 44px; font-size: 1.05rem; }
+.avatar--xl { width: 72px; height: 72px; font-size: 1.5rem; }
+
+.photo-field { display: grid; gap: .4rem; }
+.field-span, .photo-field .field-span {
+  font-family: var(--font-display); font-size: .74rem; color: var(--muted);
+  font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+}
+.photo-field-row { display: flex; align-items: center; gap: 1rem; }
+.photo-field-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.photo-field-actions .muted { width: 100%; margin: 0; }
+.roster-name { display: inline-flex; align-items: center; gap: .5rem; vertical-align: middle; }
 
 .profile-menu {
   position: absolute; right: 0; top: calc(100% + .5rem);

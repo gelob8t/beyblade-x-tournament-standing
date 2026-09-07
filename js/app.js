@@ -252,7 +252,7 @@ function myStats() {
 async function publishMyStats() {
   if (!state.team) return;
   try {
-    await teams.publishStats(state.team.id, displayName(), myStats());
+    await teams.publishStats(state.team.id, displayName(), myStats(), state.profile.photo || "");
   } catch (err) {
     console.error("stat publish failed", err);
   }
@@ -269,14 +269,63 @@ function displayName() {
   return state.profile.bladerName || (auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "Blader";
 }
 
+/** Paint an .avatar element with a photo (if given) or the name's initials. */
+function paintAvatar(el, name, photo) {
+  if (!el) return;
+  if (photo) {
+    el.textContent = "";
+    el.classList.add("avatar--img");
+    el.style.backgroundImage = `url("${photo}")`;
+  } else {
+    el.classList.remove("avatar--img");
+    el.style.backgroundImage = "";
+    el.textContent = initials(name);
+  }
+}
+
+/** Inline avatar markup for use inside innerHTML strings. */
+function avatarHtml(name, photo, cls = "") {
+  return photo
+    ? `<span class="avatar avatar--img ${cls}" style="background-image:url('${esc(photo)}')"></span>`
+    : `<span class="avatar ${cls}">${esc(initials(name))}</span>`;
+}
+
 function syncProfileChrome() {
   const name = displayName();
+  const photo = state.profile.photo || "";
   state.userName = name;
-  $("#avatar").textContent = initials(name);
-  $("#avatar-lg").textContent = initials(name);
+  paintAvatar($("#avatar"), name, photo);
+  paintAvatar($("#avatar-lg"), name, photo);
   $("#profile-name").textContent = name;
   $("#pm-name").textContent = name;
   $("#pm-email").textContent = (auth.currentUser && auth.currentUser.email) || "";
+}
+
+/** Load an image file and return a square JPEG data URL, resized down. */
+function fileToAvatarDataUrl(file, size = 256) {
+  return new Promise((resolve, reject) => {
+    if (!file || !/^image\//.test(file.type)) return reject(new Error("Please choose an image file."));
+    if (file.size > 10 * 1024 * 1024) return reject(new Error("That image is over 10 MB — pick a smaller one."));
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const s = Math.min(img.naturalWidth, img.naturalHeight);
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
+      let quality = 0.85;
+      let out = canvas.toDataURL("image/jpeg", quality);
+      while (out.length > 120000 && quality > 0.4) {
+        quality -= 0.12;
+        out = canvas.toDataURL("image/jpeg", quality);
+      }
+      resolve(out);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Couldn't read that image.")); };
+    img.src = url;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -411,7 +460,39 @@ function initProfileMenu() {
 
 function profileForm() {
   const p = state.profile || {};
+  let photo = p.photo || "";
+
+  const photoField = () => {
+    const box = document.createElement("div");
+    box.className = "photo-field";
+    const draw = () => {
+      box.innerHTML = `
+        <span class="field-span">Profile picture</span>
+        <div class="photo-field-row">
+          ${avatarHtml(displayName(), photo, "avatar--xl")}
+          <div class="photo-field-actions">
+            <button type="button" class="btn btn-ghost btn-sm" data-pick>${photo ? "Change" : "Upload"} photo</button>
+            ${photo ? `<button type="button" class="btn btn-ghost btn-sm danger" data-clear>Remove</button>` : ""}
+            <p class="muted small">Square works best. Stored resized to 256px.</p>
+          </div>
+        </div>
+        <input type="file" accept="image/*" hidden data-file />`;
+      box.querySelector("[data-pick]").addEventListener("click", () => box.querySelector("[data-file]").click());
+      const clear = box.querySelector("[data-clear]");
+      if (clear) clear.addEventListener("click", () => { photo = ""; draw(); });
+      box.querySelector("[data-file]").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try { photo = await fileToAvatarDataUrl(file); draw(); }
+        catch (err) { toast(err.message, "err"); }
+      });
+    };
+    draw();
+    return box;
+  };
+
   const { form, values } = buildForm([
+    { type: "custom", render: photoField },
     { name: "bladerName", label: "Blader name", required: true, placeholder: "e.g. Bird", default: displayName() },
     { name: "region", label: "Region / city", placeholder: "Metro Manila" },
     { name: "homeStore", label: "Home store / club", placeholder: "Where you usually play" },
@@ -427,21 +508,18 @@ function profileForm() {
       homeStore: v.homeStore.trim(),
       mainBey: v.mainBey.trim(),
       bio: v.bio.trim(),
+      photo: photo || "",
     };
-    try {
-      await store.setOne("profile", "main", data);
-      if (data.bladerName && auth.currentUser && auth.currentUser.displayName !== data.bladerName) {
-        try { await updateProfile(auth.currentUser, { displayName: data.bladerName }); } catch { /* non-fatal */ }
-      }
-      state.profile = { ...state.profile, ...data };
-      syncProfileChrome();
-      modal.close();
-      render();
-      toast("Profile updated.");
-    } catch (err) {
-      console.error(err);
-      toast(err.message || "Could not save profile.", "err");
+    await store.setOne("profile", "main", data);
+    if (data.bladerName && auth.currentUser && auth.currentUser.displayName !== data.bladerName) {
+      try { await updateProfile(auth.currentUser, { displayName: data.bladerName }); } catch { /* non-fatal */ }
     }
+    state.profile = { ...state.profile, ...data };
+    syncProfileChrome();
+    if (state.team) await publishMyStats();
+    modal.close();
+    render();
+    toast("Profile updated.");
   });
   modal.open("Edit profile", form);
 }
@@ -554,7 +632,7 @@ function renderDashboard(main) {
     </div>
 
     <div class="identity">
-      <span class="avatar">${esc(initials(displayName()))}</span>
+      ${avatarHtml(displayName(), state.profile.photo, "avatar--lg")}
       <div>
         <div class="identity-name">${esc(displayName())}</div>
         <div class="identity-meta">${esc(idMeta || "Add your details from the profile menu")}</div>
@@ -1075,7 +1153,7 @@ function teamRoster(panel) {
         <tbody>
           ${rows.map((r, i) => `<tr>
             <td>${i + 1}</td>
-            <td>${esc(r.bladerName || "Blader")}${r.role === "owner" ? ` <span class="chip chip--accent">owner</span>` : ""}${r.role === "editor" ? ` <span class="chip chip--accent">editor</span>` : ""}${r.uid === auth.currentUser.uid ? ` <span class="chip">you</span>` : ""}</td>
+            <td><span class="roster-name">${avatarHtml(r.bladerName, r.photo, "avatar--sm")}<span>${esc(r.bladerName || "Blader")}</span></span>${r.role === "owner" ? ` <span class="chip chip--accent">owner</span>` : ""}${r.role === "editor" ? ` <span class="chip chip--accent">editor</span>` : ""}${r.uid === auth.currentUser.uid ? ` <span class="chip">you</span>` : ""}</td>
             <td>${r.mw}–${r.ml}</td>
             <td><div class="mini-bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div> ${Math.round(r.rate * 100)}%</td>
             <td>${r.gw}–${r.gl}</td>
