@@ -3,8 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Beyblade X Journey</title>
-  <meta name="description" content="Track your Beyblade X tournament journey: tournaments, matches, collection, decks, team and friends." />
+  <title>Beyblade X Journey — track your matches, tournaments &amp; combos</title>
+  <meta name="description" content="Free tracker for your Beyblade X career: tournaments, matches, live scoring, teams, friends, deep stats, achievements, and a community-rated combo meta. Installable, works offline." />
+  <meta property="og:title" content="Beyblade X Journey" />
+  <meta property="og:description" content="Track every tournament, match and combo — plus teams, friends, stats and a community-rated meta." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="./icons/icon-512.png" />
+  <meta name="twitter:card" content="summary" />
   <link rel="icon" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   <link rel="manifest" href="./manifest.webmanifest" />
@@ -24,9 +29,53 @@
     <p>Loading…</p>
   </div>
 
+  <!-- ===================== LANDING ===================== -->
+  <section id="landing" class="landing" hidden>
+    <header class="landing-nav">
+      <div class="topbar-brand">
+        <span class="brand-x brand-x--sm">X</span>
+        <strong>BEYBLADE X<span class="brand-sub">JOURNEY</span></strong>
+      </div>
+      <button class="btn btn-ghost btn-sm" data-auth="signin">Sign in</button>
+    </header>
+
+    <div class="landing-hero">
+      <span class="brand-x brand-x--xl">X</span>
+      <h1>Your Beyblade X career, tracked.</h1>
+      <p class="landing-sub">Every tournament, every match, every combo — plus teams, friends, deep stats and a community-rated meta. Free, and it runs on your own Firebase.</p>
+      <div class="landing-cta">
+        <button class="btn btn-primary" data-auth="signup">Get started — free</button>
+        <button class="btn btn-ghost" data-auth="signin">I have an account</button>
+      </div>
+      <p class="muted small">Installable on your phone · works offline · your data stays in your project</p>
+    </div>
+
+    <div class="landing-features">
+      <div class="lf"><span class="lf-i">🏟️</span><b>Tournaments</b><span>Log placements, records, formats and notes.</span></div>
+      <div class="lf"><span class="lf-i">⚔️</span><b>Matches &amp; live scoring</b><span>Full match logs, or a big-button mode to score at the table.</span></div>
+      <div class="lf"><span class="lf-i">📊</span><b>Deep stats</b><span>Win rate by month, streaks, head-to-head, matchup breakdowns.</span></div>
+      <div class="lf"><span class="lf-i">👥</span><b>Teams</b><span>Shared roster + leaderboard, 3v3 battles, team tournaments.</span></div>
+      <div class="lf"><span class="lf-i">🤝</span><b>Friends</b><span>Add by code, compare records, see an activity feed.</span></div>
+      <div class="lf"><span class="lf-i">🌀</span><b>Meta</b><span>Community-rated combo tier list, re-derived from votes weekly.</span></div>
+      <div class="lf"><span class="lf-i">🏆</span><b>Achievements</b><span>19 badges to chase as your journey grows.</span></div>
+      <div class="lf"><span class="lf-i">📴</span><b>Offline &amp; PWA</b><span>Log matches with no signal; syncs when you're back.</span></div>
+    </div>
+
+    <div id="landing-meta" class="landing-meta" hidden>
+      <h2>This week's top combos</h2>
+      <ul id="landing-combos" class="landing-combos"></ul>
+    </div>
+
+    <div class="landing-foot">
+      <button class="btn btn-primary" data-auth="signup">Start your journey</button>
+      <p class="muted small">No app store needed. <a href="https://github.com/gelob8t/beyblade-x-tournament-standing" target="_blank" rel="noopener">Source on GitHub</a>.</p>
+    </div>
+  </section>
+
   <!-- ===================== AUTH VIEW ===================== -->
   <section id="auth-view" class="auth-view" hidden>
     <div class="auth-card">
+      <button class="btn-link" id="auth-back" type="button">&larr; Back</button>
       <div class="brand">
         <span class="brand-x">X</span>
         <div>

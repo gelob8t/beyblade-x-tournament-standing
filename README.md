@@ -26,8 +26,10 @@ Works **offline** (IndexedDB cache): reads come from the local cache, writes que
 and sync when you reconnect. Deletes are instant with a 6-second **Undo**.
 | **Friend profiles** | Tap a friend (list or feed) to open their profile: identity, record, and full match history — history shown only if their activity is Public |
 
-Each account's personal journey is private and syncs across any device you sign in on.
-Team data (roster, battles, events) is shared with everyone on that team.
+Logged-out visitors get a landing page (features + this week's top combos); the
+sign-in card is one click away. Each account's personal journey is private and
+syncs across any device you sign in on. Team data (roster, battles, events) is
+shared with everyone on that team.
 
 ---
 

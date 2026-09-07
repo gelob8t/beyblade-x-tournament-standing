@@ -535,6 +535,47 @@ function initAuthUi() {
       toast(friendlyAuthError(err), "err");
     }
   });
+
+  // landing <-> auth navigation
+  $$("[data-auth]").forEach((b) =>
+    b.addEventListener("click", () => showAuth(b.dataset.auth))
+  );
+  $("#auth-back").addEventListener("click", showLanding);
+}
+
+function showLanding() {
+  $("#app-loading").hidden = true;
+  $("#shell").hidden = true;
+  $("#auth-view").hidden = true;
+  $("#landing").hidden = false;
+  populateLandingMeta();
+}
+
+function showAuth(mode) {
+  const tab = $$(".auth-tab").find((t) => t.dataset.mode === (mode === "signup" ? "signup" : "signin"));
+  if (tab && !tab.classList.contains("is-active")) tab.click();
+  $("#landing").hidden = true;
+  $("#auth-view").hidden = false;
+  setTimeout(() => $("#auth-email").focus(), 50);
+}
+
+let landingMetaDone = false;
+async function populateLandingMeta() {
+  if (landingMetaDone) return;
+  landingMetaDone = true;
+  try {
+    const data = await meta.loadCurated();
+    const top = (data.combos || [])
+      .slice()
+      .sort((a, b) => (b.score || 0) - (a.score || 0) || ("SABCD".indexOf(a.tier) - "SABCD".indexOf(b.tier)))
+      .slice(0, 4);
+    if (!top.length) return;
+    $("#landing-combos").innerHTML = top.map((c) => `
+      <li><span class="tier tier--${esc(c.tier || "B")}">${esc(c.tier || "B")}</span>
+      <span>${esc([c.blade, c.ratchet, c.bit].filter(Boolean).join(" "))}</span>
+      ${c.role ? `<span class="chip">${esc(c.role)}</span>` : ""}</li>`).join("");
+    $("#landing-meta").hidden = false;
+  } catch { /* teaser is optional */ }
 }
 
 function friendlyAuthError(err) {
@@ -2817,12 +2858,12 @@ initAuthUi();
 initShell();
 
 if (!isConfigured) {
-  $("#app-loading").hidden = true;
-  $("#auth-view").hidden = false;
+  showLanding();
 } else {
   onAuthStateChanged(auth, async (user) => {
     $("#app-loading").hidden = true;
     if (user) {
+      $("#landing").hidden = true;
       $("#auth-view").hidden = true;
       $("#shell").hidden = false;
       state.loaded = false;
@@ -2839,7 +2880,8 @@ if (!isConfigured) {
     } else {
       state.loaded = false;
       $("#shell").hidden = true;
-      $("#auth-view").hidden = false;
+      // keep the auth card up if the user was mid sign-in, else show landing
+      if ($("#auth-view").hidden) showLanding();
     }
   });
 }
