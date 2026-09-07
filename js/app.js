@@ -13,6 +13,7 @@ import {
 import * as store from "./store.js";
 import * as teams from "./teams.js";
 import * as friends from "./friends.js";
+import * as meta from "./meta.js";
 import {
   FINISHES, finishLabel, finishPts,
   matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
@@ -221,6 +222,10 @@ const state = {
   openFriend: null,
   friendProfile: null,
   achv: [],
+  meta: null,
+  metaTab: "combos",
+  metaSort: "community",
+  myVotes: {},
   loaded: false,
 };
 
@@ -757,6 +762,7 @@ function render() {
     matches: renderMatches,
     collection: renderCollection,
     decks: renderDecks,
+    meta: renderMeta,
     stats: renderStats,
     team: renderTeam,
     friends: renderFriends,
@@ -1674,8 +1680,8 @@ function renderDecks(main) {
   );
 }
 
-function deckForm(existing) {
-  const combos = structuredClone(existing?.combos || [{}, {}, {}]);
+function deckForm(existing, seedCombo) {
+  const combos = structuredClone(existing?.combos || (seedCombo ? [seedCombo, {}, {}] : [{}, {}, {}]));
   while (combos.length < 3) combos.push({});
 
   const comboSection = () => {
@@ -1699,7 +1705,8 @@ function deckForm(existing) {
   };
 
   const { form, values } = buildForm([
-    { name: "name", label: "Deck name", required: true, placeholder: "Attack Aggro" },
+    { name: "name", label: "Deck name", required: true, placeholder: "Attack Aggro",
+      default: seedCombo ? `${seedCombo.blade} deck` : "" },
     { type: "custom", render: comboSection },
     { name: "notes", label: "Notes", type: "textarea" },
   ], existing || {});
@@ -1731,6 +1738,213 @@ function partDatalists() {
   make("ratchets-list", "Ratchet");
   make("bits-list", "Bit");
   return frag;
+}
+
+// ---------------------------------------------------------------------------
+// Meta — curated tier list + community combo ratings
+// ---------------------------------------------------------------------------
+function ownsPart(name) {
+  const n = String(name || "").trim().toLowerCase();
+  return !!n && state.beys.some((b) => (b.name || "").trim().toLowerCase() === n);
+}
+
+async function loadMeta() {
+  const [curated, community, votes] = await Promise.all([
+    meta.loadCurated(),
+    meta.listCombos().catch(() => []),
+    store.list("metaVotes").catch(() => []),
+  ]);
+  state.myVotes = {};
+  for (const v of votes) state.myVotes[v.id] = v.tier;
+
+  const byKey = new Map();
+  for (const c of curated.combos || []) {
+    const key = meta.comboKey(c.blade, c.ratchet, c.bit);
+    byKey.set(key, { key, blade: c.blade, ratchet: c.ratchet, bit: c.bit, role: c.role || "", curatedTier: c.tier || null, curatedNote: c.note || "", tally: {}, count: 0 });
+  }
+  for (const c of community) {
+    const cur = byKey.get(c.key);
+    if (cur) { cur.tally = c.tally || {}; cur.count = c.count || 0; }
+    else byKey.set(c.key, { key: c.key, blade: c.blade, ratchet: c.ratchet, bit: c.bit, role: c.role || "", curatedTier: null, curatedNote: "", tally: c.tally || {}, count: c.count || 0, addedByName: c.addedByName });
+  }
+
+  state.meta = {
+    updated: curated.updated,
+    note: curated.note,
+    roles: curated.roles || ["Attack", "Stamina", "Defense", "Balance"],
+    blades: curated.blades || [],
+    ratchets: curated.ratchets || [],
+    bits: curated.bits || [],
+    combos: [...byKey.values()].map((c) => ({
+      ...c,
+      cons: meta.consensus(c.tally, c.count),
+      owned: [c.blade, c.ratchet, c.bit].filter(ownsPart).length,
+    })),
+  };
+}
+
+const TIER_RANK = { S: 0, A: 1, B: 2, C: 3, D: 4 };
+
+function renderMeta(main) {
+  if (!state.meta) {
+    main.innerHTML = `<div class="view-head"><h1>Meta</h1></div><div class="empty">Loading the meta…</div>`;
+    loadMeta().then(() => { if (state.view === "meta") renderMeta(main); })
+      .catch((err) => { main.innerHTML = `<div class="view-head"><h1>Meta</h1></div><div class="empty">${esc(err.message || "Couldn't load the meta.")}</div>`; });
+    return;
+  }
+
+  const m = state.meta;
+  const tabs = [["combos", "Combos"], ["blades", "Blades"], ["ratchets", "Ratchets"], ["bits", "Bits"]];
+
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>Meta</h1>
+      <button class="btn btn-primary" id="add-combo">+ Add combo</button>
+    </div>
+    <p class="muted small">${esc(m.note)} <b>Snapshot: ${esc(m.updated)}.</b></p>
+    <div class="seg" id="meta-tabs">
+      ${tabs.map(([k, l]) => `<button class="seg-btn${state.metaTab === k ? " is-active" : ""}" data-mt="${k}">${l}</button>`).join("")}
+    </div>
+    <div id="meta-panel"></div>
+  `;
+
+  $("#add-combo").addEventListener("click", () => addComboForm());
+  $$("#meta-tabs .seg-btn").forEach((b) =>
+    b.addEventListener("click", () => { state.metaTab = b.dataset.mt; renderMeta(main); })
+  );
+
+  const panel = $("#meta-panel");
+  if (state.metaTab === "combos") metaCombosPanel(panel);
+  else metaPartsPanel(panel, state.metaTab);
+}
+
+function metaCombosPanel(panel) {
+  const rows = [...state.meta.combos];
+  const sort = state.metaSort;
+  rows.sort((a, b) => {
+    if (sort === "curated") return (TIER_RANK[a.curatedTier] ?? 9) - (TIER_RANK[b.curatedTier] ?? 9) || b.cons.score - a.cons.score;
+    if (sort === "votes") return b.cons.count - a.cons.count;
+    if (sort === "owned") return b.owned - a.owned || b.cons.score - a.cons.score;
+    return (b.cons.score || (b.curatedTier ? 5 - TIER_RANK[b.curatedTier] : 0)) - (a.cons.score || (a.curatedTier ? 5 - TIER_RANK[a.curatedTier] : 0));
+  });
+
+  panel.innerHTML = `
+    <div class="filter-bar">
+      <label class="muted small">Sort</label>
+      <select id="meta-sort">
+        <option value="community"${sort === "community" ? " selected" : ""}>Community rating</option>
+        <option value="curated"${sort === "curated" ? " selected" : ""}>Editor tier</option>
+        <option value="votes"${sort === "votes" ? " selected" : ""}>Most votes</option>
+        <option value="owned"${sort === "owned" ? " selected" : ""}>Parts I own</option>
+      </select>
+    </div>
+    <div class="card-list">
+      ${rows.map((c) => {
+        const mine = state.myVotes[c.key];
+        return `<article class="card meta-combo">
+          <div class="card-main">
+            <div class="match-top">
+              ${c.curatedTier ? `<span class="tier tier--${c.curatedTier}">${c.curatedTier}</span>` : ""}
+              <h3>${esc([c.blade, c.ratchet, c.bit].filter(Boolean).join(" "))}</h3>
+            </div>
+            <div class="chips">
+              ${c.role ? `<span class="chip">${esc(c.role)}</span>` : ""}
+              ${c.cons.letter ? `<span class="chip chip--accent">Community ${c.cons.letter} · ${c.cons.score.toFixed(1)} (${c.cons.count})</span>` : `<span class="chip">Unrated</span>`}
+              <span class="chip${c.owned === 3 ? " chip--accent" : ""}">Own ${c.owned}/3</span>
+            </div>
+            ${c.curatedNote ? `<p class="card-notes">${esc(c.curatedNote)}</p>` : ""}
+            <div class="tier-vote" data-key="${esc(c.key)}">
+              <span class="muted small">Your rating:</span>
+              ${meta.TIERS.map((t) => `<button class="tier-btn${mine === t ? " is-mine" : ""}" data-tier="${t}">${t}</button>`).join("")}
+            </div>
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" data-deck='${esc(JSON.stringify({ blade: c.blade, ratchet: c.ratchet, bit: c.bit }))}'>+ Deck</button>
+          </div>
+        </article>`;
+      }).join("")}
+    </div>`;
+
+  $("#meta-sort").addEventListener("change", (e) => { state.metaSort = e.target.value; renderMeta($("#main")); });
+
+  $$(".tier-vote .tier-btn", panel).forEach((b) =>
+    b.addEventListener("click", (e) => {
+      const key = e.target.closest(".tier-vote").dataset.key;
+      const combo = state.meta.combos.find((c) => c.key === key);
+      const tier = b.dataset.tier;
+      runBtn(b, tier, async () => {
+        await meta.castVote(combo, tier);
+        await store.setOne("metaVotes", key, { tier });
+        await loadMeta();
+        renderMeta($("#main"));
+        toast(`Rated ${combo.blade} ${tier}.`);
+      });
+    })
+  );
+
+  $$("[data-deck]", panel).forEach((b) =>
+    b.addEventListener("click", () => {
+      try { deckForm(null, JSON.parse(b.dataset.deck)); } catch { deckForm(); }
+    })
+  );
+}
+
+function metaPartsPanel(panel, kind) {
+  const items = state.meta[kind] || [];
+  const roles = ["", ...state.meta.roles];
+  state.metaRoleFilter = state.metaRoleFilter || "";
+  const rf = state.metaRoleFilter;
+  const hasRoles = items.some((i) => i.role);
+  const filtered = rf ? items.filter((i) => i.role === rf) : items;
+  const byTier = { S: [], A: [], B: [], C: [], D: [] };
+  for (const i of filtered) (byTier[i.tier] || byTier.B).push(i);
+
+  panel.innerHTML = `
+    ${hasRoles ? `<div class="filter-bar">
+      ${roles.map((r) => `<button class="chip${rf === r ? " chip--accent" : ""}" data-role="${esc(r)}">${r || "All"}</button>`).join("")}
+    </div>` : ""}
+    ${["S", "A", "B", "C", "D"].filter((t) => byTier[t].length).map((t) => `
+      <section class="panel">
+        <h2><span class="tier tier--${t}">${t}</span> tier</h2>
+        <ul class="part-list">
+          ${byTier[t].map((i) => `<li>
+            <div><b>${esc(i.name)}</b>${i.line ? ` <span class="chip">${esc(i.line)}</span>` : ""}${i.role ? ` <span class="chip">${esc(i.role)}</span>` : ""}
+              ${i.note ? `<div class="muted small">${esc(i.note)}</div>` : ""}</div>
+            ${ownsPart(i.name) ? `<span class="chip chip--accent">owned</span>` : ""}
+          </li>`).join("")}
+        </ul>
+      </section>`).join("")}
+  `;
+
+  $$("[data-role]", panel).forEach((b) =>
+    b.addEventListener("click", () => { state.metaRoleFilter = b.dataset.role; renderMeta($("#main")); })
+  );
+}
+
+function addComboForm() {
+  const { form, values } = buildForm([
+    { name: "blade", label: "Blade", required: true, placeholder: "e.g. Dran Buster" },
+    { name: "ratchet", label: "Ratchet", required: true, placeholder: "e.g. 3-60" },
+    { name: "bit", label: "Bit", required: true, placeholder: "e.g. Flat" },
+    { name: "role", label: "Role", type: "select", options: ["Attack", "Stamina", "Defense", "Balance"].map((v) => ({ value: v, label: v })) },
+  ], {});
+  // datalists from the user's collection
+  form.append(partDatalists());
+  form.querySelector('[name="blade"]').setAttribute("list", "blades-list");
+  form.querySelector('[name="ratchet"]').setAttribute("list", "ratchets-list");
+  form.querySelector('[name="bit"]').setAttribute("list", "bits-list");
+
+  bindSubmit(form, async () => {
+    const v = values();
+    const combo = { blade: v.blade.trim(), ratchet: v.ratchet.trim(), bit: v.bit.trim(), role: v.role };
+    await meta.addCombo(combo);
+    await loadMeta();
+    modal.close();
+    state.metaTab = "combos";
+    renderMeta($("#main"));
+    toast("Combo added — rate it to seed the tier.");
+  });
+  modal.open("Add a combo to the meta list", form);
 }
 
 // ---------------------------------------------------------------------------

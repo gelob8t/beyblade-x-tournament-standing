@@ -244,6 +244,28 @@ textarea { resize: vertical; }
   color: #fff; background: var(--red); border-radius: 999px;
 }
 
+/* ---------- meta / tier list ---------- */
+.tier {
+  display: inline-grid; place-content: center;
+  width: 26px; height: 24px; flex: none;
+  font-family: var(--font-display); font-weight: 800; font-size: .85rem; color: #06080d;
+  clip-path: polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%);
+}
+.tier--S { background: linear-gradient(135deg, #ffd24a, #ff9d2e); }
+.tier--A { background: linear-gradient(135deg, #7fe08a, #35c06a); }
+.tier--B { background: linear-gradient(135deg, #6fb6ff, #2b7dff); color: #fff; }
+.tier--C { background: linear-gradient(135deg, #b6a2ff, #8b6dff); color: #fff; }
+.tier--D { background: var(--line-bright); color: var(--text); }
+
+.tier-vote { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin-top: .6rem; }
+.tier-btn {
+  width: 30px; height: 28px; border: 1px solid var(--line); background: var(--bg-2);
+  color: var(--muted); font-family: var(--font-display); font-weight: 700; cursor: pointer;
+  clip-path: polygon(4px 0,100% 0,calc(100% - 4px) 100%,0 100%);
+}
+.tier-btn:hover { border-color: var(--blue); color: var(--text); }
+.tier-btn.is-mine { background: var(--split); border-color: transparent; color: #fff; }
+
 /* ---------- achievements ---------- */
 .achv-row { display: flex; flex-wrap: wrap; gap: .4rem; }
 .achv-chip {

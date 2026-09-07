@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   finishPts, matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
+  comboKey, consensus,
 } from "../js/stats.js";
 
 const G = (winner, finish) => ({ winner, finish });
@@ -114,4 +115,23 @@ test("achievements: full-kit needs all four finish types", () => {
   const games = ["Spin", "Over", "Burst", "Xtreme"].map((f) => ({ winner: "me", finish: f }));
   const a = achievements({ matches: [{ result: "W", games }] });
   assert.ok(a.find((x) => x.id === "all-finishes").done);
+});
+
+test("comboKey is stable and normalised", () => {
+  assert.equal(comboKey("Dran Buster", "3-60", "Flat"), comboKey(" dran buster ", "3-60", "flat"));
+  assert.equal(comboKey("Wizard Rod", "5-70", "Point"), "wizard-rod__5-70__point");
+});
+
+test("consensus: empty tally has no letter", () => {
+  const c = consensus({}, 0);
+  assert.equal(c.letter, null);
+  assert.equal(c.count, 0);
+});
+
+test("consensus: maps average score to a letter", () => {
+  assert.equal(consensus({ S: 3 }, 3).letter, "S");
+  assert.equal(consensus({ A: 2, B: 2 }, 4).letter, "A"); // avg 3.5
+  assert.equal(consensus({ S: 1, D: 1 }, 2).letter, "B"); // avg 3.0
+  assert.equal(consensus({ D: 5 }, 5).letter, "D");
+  assert.equal(consensus({ S: 1, A: 1, B: 1 }, 3).count, 3);
 });

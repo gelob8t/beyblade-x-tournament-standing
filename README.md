@@ -20,6 +20,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Friends activity** | Dashboard feed of friends' recent matches / placements — shown only for friends who set their activity to **Public** (Edit profile → Match activity visibility; default Private) |
 | **Live scoring** | Full-screen, big-button mode to score a match at the table — tap who won each game, pick the finish, first to 4 points, save straight to Matches |
 | **Achievements** | 19 badges from your data (milestones, streaks, finishes, collection, social); progress bars on locked ones; unlock toast; count shown on your profile card |
+| **Meta** | Curated Beyblade X tier list (`data/meta.json`) for blades / ratchets / bits / combos, plus a **community layer**: signed-in users rate combos S–D and the app aggregates the votes into a live consensus. Flags which meta parts you own; one-tap "+ Deck". |
 
 Works **offline** (IndexedDB cache): reads come from the local cache, writes queue
 and sync when you reconnect. Deletes are instant with a 6-second **Undo**.
@@ -111,10 +112,12 @@ js/
   firebase-config.js   <-- you edit this
   firebase.js          Firebase init + re-exports (CDN, no build)
   store.js             Firestore CRUD, scoped to users/{uid}/...
-  stats.js             pure match/stat math (unit-tested)
+  stats.js             pure match/stat/meta math (unit-tested)
   teams.js             shared team data (teams/... and teamCodes/...)
   friends.js           friend codes, requests, friendships, cards, activity feed
+  meta.js              community combo ratings (metaCombos/...)
   app.js               auth flow, views, forms, wiring
+data/meta.json         curated tier-list snapshot (edit or PR to update)
 firestore.rules        security rules (auto-deployed if FIREBASE_TOKEN is set)
 firebase.json          points firebase-tools at firestore.rules
 test/stats.test.mjs    unit tests, run in CI before every deploy

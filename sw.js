@@ -15,6 +15,8 @@ const SHELL = [
   "./js/stats.js",
   "./js/teams.js",
   "./js/friends.js",
+  "./js/meta.js",
+  "./data/meta.json",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",

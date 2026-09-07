@@ -64,6 +64,26 @@ service cloud.firestore {
       allow create, update, delete: if signedIn() && ownerUid == request.auth.uid;
     }
 
+    // ---- community meta: combo tier list, one vote per user ----
+    match /metaCombos/{key} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.addedBy == request.auth.uid
+        && request.resource.data.blade is string;
+      // vote tally updates — the combo's identity and author can't change
+      allow update: if signedIn()
+        && request.resource.data.blade == resource.data.blade
+        && request.resource.data.ratchet == resource.data.ratchet
+        && request.resource.data.bit == resource.data.bit
+        && request.resource.data.addedBy == resource.data.addedBy;
+      allow delete: if false;
+
+      match /votes/{voterUid} {
+        allow read: if signedIn();
+        allow write: if signedIn() && voterUid == request.auth.uid;
+      }
+    }
+
     // ---- invite-code lookup ----------------------------------------
     // Low-value: maps a short code to a teamId so a new member can find
     // the team before they belong to it.

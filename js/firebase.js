@@ -29,8 +29,10 @@ import {
   limit,
   arrayUnion,
   arrayRemove,
+  increment,
   serverTimestamp,
   writeBatch,
+  runTransaction,
   waitForPendingWrites,
   onSnapshotsInSync,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
@@ -83,8 +85,10 @@ export {
   limit,
   arrayUnion,
   arrayRemove,
+  increment,
   serverTimestamp,
   writeBatch,
+  runTransaction,
   waitForPendingWrites,
   onSnapshotsInSync,
 };

@@ -59,6 +59,29 @@ export function streaks(chronMatches) {
   return { current: Math.abs(run), type: run > 0 ? "win" : run < 0 ? "loss" : "", longestWin: longestW };
 }
 
+// ---- meta / combo tier list ------------------------------------------------
+
+export const TIERS = ["S", "A", "B", "C", "D"];
+const TIER_WEIGHT = { S: 5, A: 4, B: 3, C: 2, D: 1 };
+
+/** Stable key for a Blade/Ratchet/Bit combo. */
+export function comboKey(blade, ratchet, bit) {
+  return [blade, ratchet, bit]
+    .map((s) => String(s || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
+    .join("__")
+    .slice(0, 200);
+}
+
+/** Turn an S–D vote tally into an average score + consensus letter. */
+export function consensus(tally = {}, count = 0) {
+  const n = count || TIERS.reduce((s, t) => s + (tally[t] || 0), 0);
+  if (!n) return { score: 0, letter: null, count: 0 };
+  const score = TIERS.reduce((s, t) => s + (tally[t] || 0) * TIER_WEIGHT[t], 0) / n;
+  const letter =
+    score >= 4.5 ? "S" : score >= 3.5 ? "A" : score >= 2.5 ? "B" : score >= 1.5 ? "C" : "D";
+  return { score: Math.round(score * 10) / 10, letter, count: n };
+}
+
 function achv(id, icon, name, desc, done, have, need) {
   const a = { id, icon, name, desc, done: !!done };
   if (need && !done && have != null) a.progress = { have: Math.max(0, Math.min(have, need)), need };
