@@ -420,6 +420,44 @@ textarea { resize: vertical; }
 .combo-edit-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .4rem; }
 @media (max-width: 480px) { .combo-edit-row { grid-template-columns: 1fr; } }
 
+/* ---------- team ---------- */
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; margin-bottom: .9rem; }
+.team-banner {
+  --team: var(--blue);
+  display: flex; align-items: center; gap: 1rem;
+  padding: 1rem 1.2rem; margin-bottom: 1.3rem;
+  background: linear-gradient(115deg, color-mix(in srgb, var(--team) 22%, transparent), rgba(255,47,69,.1)), var(--panel);
+  border: 1px solid var(--line); border-left: 4px solid var(--team);
+  clip-path: polygon(0 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%);
+}
+.team-crest {
+  width: 52px; height: 52px; flex: none; display: grid; place-content: center;
+  font-family: var(--font-display); font-weight: 700; font-style: italic; font-size: 1rem; color: #fff;
+  background: linear-gradient(135deg, var(--team), color-mix(in srgb, var(--team) 40%, var(--red)));
+  clip-path: polygon(16% 0, 100% 0, 84% 100%, 0 100%);
+}
+.team-banner .identity-main { margin-left: auto; }
+
+.seg { display: flex; gap: .2rem; background: var(--bg); padding: .3rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.seg-btn {
+  padding: .5em .9em; border: none; background: transparent; color: var(--muted);
+  font-family: var(--font-display); font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  font-size: .78rem; cursor: pointer;
+  clip-path: polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%);
+}
+.seg-btn:hover { color: var(--text); }
+.seg-btn.is-active { background: var(--panel-2); color: var(--text); box-shadow: inset 0 -2px 0 var(--blue); }
+
+.kv { display: grid; grid-template-columns: max-content 1fr; gap: .35rem 1rem; margin: 0 0 .6rem; font-size: .9rem; }
+.kv dt { color: var(--muted); font-family: var(--font-display); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+.kv dd { margin: 0; }
+.kv code { background: var(--bg); padding: .1em .5em; border: 1px solid var(--line); letter-spacing: .12em; }
+
+.lineup-edit-row { display: grid; grid-template-columns: 1fr .8fr 1fr auto; gap: .4rem; }
+@media (max-width: 520px) { .lineup-edit-row { grid-template-columns: 1fr; } }
+
+input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
+
 /* ---------- toast ---------- */
 .toast {
   position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%);

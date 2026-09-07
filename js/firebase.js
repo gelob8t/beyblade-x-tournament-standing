@@ -12,6 +12,7 @@ import {
 import {
   getFirestore,
   collection,
+  collectionGroup,
   doc,
   addDoc,
   getDoc,
@@ -20,7 +21,11 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
+  limit,
+  arrayUnion,
+  arrayRemove,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -50,6 +55,7 @@ export {
   sendPasswordResetEmail,
   // firestore helpers
   collection,
+  collectionGroup,
   doc,
   addDoc,
   getDoc,
@@ -58,6 +64,10 @@ export {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
+  limit,
+  arrayUnion,
+  arrayRemove,
   serverTimestamp,
 };

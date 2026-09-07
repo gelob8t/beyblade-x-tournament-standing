@@ -9,6 +9,7 @@ import {
   sendPasswordResetEmail,
 } from "./firebase.js";
 import * as store from "./store.js";
+import * as teams from "./teams.js";
 
 // ---------------------------------------------------------------------------
 // Tiny helpers
@@ -131,6 +132,11 @@ const state = {
   beys: [],
   decks: [],
   profile: {},
+  team: null,
+  teamMembers: [],
+  teamBattles: [],
+  teamEvents: [],
+  teamTab: "roster",
   loaded: false,
 };
 
@@ -143,6 +149,61 @@ async function refresh() {
     store.getOne("profile", "main"),
   ]);
   Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, loaded: true });
+  await refreshTeam();
+}
+
+async function refreshTeam() {
+  const teamId = state.profile.teamId;
+  if (!teamId) {
+    Object.assign(state, { team: null, teamMembers: [], teamBattles: [], teamEvents: [] });
+    return;
+  }
+  try {
+    const team = await teams.getTeam(teamId);
+    if (!team) {
+      // team was deleted — detach quietly
+      await store.setOne("profile", "main", { teamId: "" });
+      state.profile.teamId = "";
+      Object.assign(state, { team: null, teamMembers: [], teamBattles: [], teamEvents: [] });
+      return;
+    }
+    const [members, battles, events] = await Promise.all([
+      teams.listMembers(teamId),
+      teams.listBattles(teamId),
+      teams.listEvents(teamId),
+    ]);
+    Object.assign(state, { team, teamMembers: members, teamBattles: battles, teamEvents: events });
+  } catch (err) {
+    console.error("team load failed", err);
+    Object.assign(state, { team: null, teamMembers: [], teamBattles: [], teamEvents: [] });
+  }
+}
+
+/** Aggregate record for the signed-in user, from their own data. */
+function myStats() {
+  const played = state.matches.filter((m) => matchResult(m) !== "—");
+  let gW = 0, gL = 0;
+  for (const m of state.matches) for (const g of m.games || []) {
+    if (g.winner === "me") gW++; else gL++;
+  }
+  const placements = state.tournaments
+    .map((t) => Number(t.placement)).filter((n) => Number.isFinite(n) && n > 0);
+  return {
+    matchW: played.filter((m) => matchResult(m) === "W").length,
+    matchL: played.filter((m) => matchResult(m) === "L").length,
+    gameW: gW, gameL: gL,
+    tournaments: state.tournaments.length,
+    bestPlacement: placements.length ? Math.min(...placements) : null,
+  };
+}
+
+async function publishMyStats() {
+  if (!state.team) return;
+  try {
+    await teams.publishStats(state.team.id, displayName(), myStats());
+  } catch (err) {
+    console.error("stat publish failed", err);
+  }
 }
 
 function initials(name) {
@@ -369,6 +430,7 @@ function render() {
     matches: renderMatches,
     collection: renderCollection,
     decks: renderDecks,
+    team: renderTeam,
   }[state.view] || renderDashboard)(main);
 }
 
@@ -429,7 +491,8 @@ function renderDashboard(main) {
   const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
   const prof = state.profile || {};
-  const idMeta = [prof.region, prof.homeStore].filter(Boolean).join(" · ");
+  const teamTag = state.team ? (state.team.tag ? `[${state.team.tag}] ` : "") + state.team.name : "";
+  const idMeta = [teamTag, prof.region, prof.homeStore].filter(Boolean).join(" · ");
 
   main.innerHTML = `
     <div class="view-head">
@@ -870,6 +933,460 @@ function partDatalists() {
 }
 
 // ---------------------------------------------------------------------------
+// Team
+// ---------------------------------------------------------------------------
+function isTeamOwner() {
+  return state.team && auth.currentUser && state.team.ownerUid === auth.currentUser.uid;
+}
+
+function renderTeam(main) {
+  if (!state.team) return renderTeamJoin(main);
+
+  const t = state.team;
+  const tabs = [
+    ["roster", "Roster"],
+    ["battles", "Team battles"],
+    ["events", "Team events"],
+    ["about", "About / settings"],
+  ];
+
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>${esc(t.name)}${t.tag ? ` <span class="muted">[${esc(t.tag)}]</span>` : ""}</h1>
+      <button class="btn btn-ghost btn-sm" id="copy-code">Invite code: ${esc(t.inviteCode)}</button>
+    </div>
+
+    <div class="team-banner" style="--team:${cssColor(t.color)}">
+      <div class="team-crest">${esc((t.tag || t.name || "T").slice(0, 3).toUpperCase())}</div>
+      <div>
+        <div class="identity-meta">${esc([t.region, t.founded ? "est. " + t.founded : ""].filter(Boolean).join(" · ") || "—")}</div>
+        ${t.bio ? `<p class="card-notes">${esc(t.bio)}</p>` : ""}
+      </div>
+      <div class="identity-main"><span>Members</span><b>${state.teamMembers.length}</b></div>
+    </div>
+
+    <div class="seg" id="team-tabs">
+      ${tabs.map(([k, label]) => `<button class="seg-btn${state.teamTab === k ? " is-active" : ""}" data-tt="${k}">${label}</button>`).join("")}
+    </div>
+
+    <div id="team-panel"></div>
+  `;
+
+  $("#copy-code").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(t.inviteCode); toast("Invite code copied."); }
+    catch { toast(t.inviteCode, "warn"); }
+  });
+  $$("#team-tabs .seg-btn").forEach((b) =>
+    b.addEventListener("click", () => { state.teamTab = b.dataset.tt; renderTeam(main); })
+  );
+
+  const panel = $("#team-panel");
+  ({
+    roster: teamRoster,
+    battles: teamBattles,
+    events: teamEvents,
+    about: teamAbout,
+  }[state.teamTab] || teamRoster)(panel);
+}
+
+function cssColor(c) {
+  return /^#[0-9a-f]{3,8}$/i.test(String(c || "")) ? c : "#2b7dff";
+}
+
+function teamRoster(panel) {
+  const rows = [...state.teamMembers].map((m) => {
+    const s = m.stats || {};
+    const mw = Number(s.matchW || 0), ml = Number(s.matchL || 0);
+    return { ...m, mw, ml, total: mw + ml, rate: mw + ml ? mw / (mw + ml) : 0,
+      gw: Number(s.gameW || 0), gl: Number(s.gameL || 0), tn: Number(s.tournaments || 0), best: s.bestPlacement };
+  }).sort((a, b) => b.rate - a.rate || b.total - a.total);
+
+  panel.innerHTML = `
+    <div class="row-between">
+      <p class="muted small">Ranked by match win rate. Records update when each member logs matches.</p>
+      <button class="btn btn-ghost btn-sm" id="sync-stats">Sync my record</button>
+    </div>
+    <section class="panel">
+      <table class="data-table">
+        <thead><tr><th>#</th><th>Blader</th><th>Matches</th><th>Win rate</th><th>Games</th><th>Events</th><th>Best</th>${isTeamOwner() ? "<th></th>" : ""}</tr></thead>
+        <tbody>
+          ${rows.map((r, i) => `<tr>
+            <td>${i + 1}</td>
+            <td>${esc(r.bladerName || "Blader")}${r.role === "owner" ? ` <span class="chip chip--accent">owner</span>` : ""}${r.uid === auth.currentUser.uid ? ` <span class="chip">you</span>` : ""}</td>
+            <td>${r.mw}–${r.ml}</td>
+            <td><div class="mini-bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div> ${Math.round(r.rate * 100)}%</td>
+            <td>${r.gw}–${r.gl}</td>
+            <td>${r.tn}</td>
+            <td>${r.best ? ordinal(r.best) : "—"}</td>
+            ${isTeamOwner() ? `<td>${r.uid === state.team.ownerUid ? "" : `<button class="btn-link danger" data-kick="${r.uid}">remove</button>`}</td>` : ""}
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </section>
+  `;
+  $("#sync-stats").addEventListener("click", async () => {
+    await publishMyStats();
+    await refreshTeam();
+    renderTeam($("#main"));
+    toast("Your record is up to date.");
+  });
+  $$("[data-kick]", panel).forEach((b) =>
+    b.addEventListener("click", () => confirmTeamAction(
+      "Remove member", "Remove this blader from the team?",
+      async () => { await teams.removeMember(state.team.id, b.dataset.kick); await refreshTeam(); renderTeam($("#main")); toast("Member removed."); }
+    ))
+  );
+}
+
+function teamBattles(panel) {
+  const rows = state.teamBattles;
+  panel.innerHTML = `
+    <div class="row-between">
+      <p class="muted small">3v3 and squad battles against other teams.</p>
+      <button class="btn btn-primary btn-sm" id="add-battle">+ Log team battle</button>
+    </div>
+    ${rows.length === 0 ? `<div class="empty">No team battles logged yet.</div>` : `
+    <div class="card-list">
+      ${rows.map((b) => {
+        const res = b.teamResult || autoTeamResult(b);
+        return `<article class="card">
+          <div class="card-main">
+            <div class="match-top">
+              <span class="result-badge result-badge--${res === "W" ? "w" : res === "L" ? "l" : "x"}">${res || "—"}</span>
+              <h3>vs ${esc(b.opponentTeam || "Unknown team")}</h3>
+              ${b.format ? `<span class="score">${esc(b.format)}</span>` : ""}
+            </div>
+            <p class="muted">${fmtDate(b.date)}${b.event ? " · " + esc(b.event) : ""}${b.createdByName ? " · logged by " + esc(b.createdByName) : ""}</p>
+            ${(b.lineup || []).length ? `<div class="game-line">
+              ${b.lineup.map((l) => `<span class="game-tag game-tag--${l.result === "W" ? "w" : "l"}">${esc(l.player || "?")} ${l.result || "?"}${l.opponent ? " vs " + esc(l.opponent) : ""}</span>`).join("")}
+            </div>` : ""}
+            ${b.notes ? `<p class="card-notes">${esc(b.notes)}</p>` : ""}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm" data-edit="${b.id}">Edit</button>
+            <button class="btn btn-ghost btn-sm danger" data-del="${b.id}">Delete</button>
+          </div>
+        </article>`;
+      }).join("")}
+    </div>`}
+  `;
+  $("#add-battle").addEventListener("click", () => battleForm());
+  $$("[data-edit]", panel).forEach((b) =>
+    b.addEventListener("click", () => battleForm(state.teamBattles.find((x) => x.id === b.dataset.edit)))
+  );
+  $$("[data-del]", panel).forEach((b) =>
+    b.addEventListener("click", () => confirmTeamAction(
+      "Delete battle", "Delete this team battle?",
+      async () => { await teams.removeBattle(state.team.id, b.dataset.del); await refreshTeam(); renderTeam($("#main")); toast("Battle deleted."); }
+    ))
+  );
+}
+
+function autoTeamResult(b) {
+  const w = (b.lineup || []).filter((l) => l.result === "W").length;
+  const l = (b.lineup || []).filter((l) => l.result === "L").length;
+  if (!w && !l) return "";
+  return w === l ? "D" : w > l ? "W" : "L";
+}
+
+function battleForm(existing) {
+  const lineup = structuredClone(existing?.lineup || [{}, {}, {}]);
+  const memberNames = state.teamMembers.map((m) => m.bladerName || "Blader");
+
+  const lineupSection = () => {
+    const box = document.createElement("div");
+    box.className = "games-editor";
+    const draw = () => {
+      box.innerHTML = `<div class="field"><span>Line-up (your blader · result · their blader)</span></div>`;
+      lineup.forEach((l, i) => {
+        const row = document.createElement("div");
+        row.className = "lineup-edit-row";
+        row.innerHTML = `
+          <input placeholder="Your blader" value="${esc(l.player || "")}" data-k="player" list="team-members-list" />
+          <select data-k="result">
+            <option value="">?</option>
+            <option value="W"${l.result === "W" ? " selected" : ""}>Win</option>
+            <option value="L"${l.result === "L" ? " selected" : ""}>Loss</option>
+          </select>
+          <input placeholder="Their blader" value="${esc(l.opponent || "")}" data-k="opponent" />
+          <button type="button" class="btn btn-ghost btn-sm danger" data-rm="${i}">✕</button>`;
+        row.querySelectorAll("[data-k]").forEach((inp) =>
+          inp.addEventListener("input", (e) => (lineup[i][e.target.dataset.k] = e.target.value)));
+        row.querySelector("[data-rm]").addEventListener("click", () => { lineup.splice(i, 1); draw(); });
+        box.append(row);
+      });
+      const add = document.createElement("button");
+      add.type = "button"; add.className = "btn btn-ghost btn-sm"; add.textContent = "+ Add blader";
+      add.addEventListener("click", () => { lineup.push({}); draw(); });
+      box.append(add);
+      const dl = document.createElement("datalist");
+      dl.id = "team-members-list";
+      memberNames.forEach((n) => { const o = document.createElement("option"); o.value = n; dl.append(o); });
+      box.append(dl);
+    };
+    draw();
+    return box;
+  };
+
+  const { form, values } = buildForm([
+    { name: "date", label: "Date", type: "date", default: today() },
+    { name: "opponentTeam", label: "Opponent team", required: true, placeholder: "Team name" },
+    { name: "format", label: "Format", type: "select", options: ["3v3", "5v5", "1v1", "2v2", "Other"].map((v) => ({ value: v, label: v })) },
+    { name: "event", label: "Event (optional)", placeholder: "League night, regional…" },
+    { type: "custom", render: lineupSection },
+    { name: "teamResult", label: "Team result", type: "select", options: [
+      { value: "", label: "Auto from line-up" }, { value: "W", label: "Win" }, { value: "L", label: "Loss" }, { value: "D", label: "Draw" },
+    ] },
+    { name: "notes", label: "Notes", type: "textarea" },
+  ], existing || {});
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    const clean = lineup.filter((l) => (l.player || "").trim() || l.result);
+    const data = {
+      date: v.date || "",
+      opponentTeam: v.opponentTeam.trim(),
+      format: v.format,
+      event: v.event.trim(),
+      lineup: clean.map((l) => ({ player: (l.player || "").trim(), result: l.result || "", opponent: (l.opponent || "").trim() })),
+      teamResult: v.teamResult,
+      notes: v.notes.trim(),
+      createdByName: displayName(),
+    };
+    try {
+      if (existing) await teams.updateBattle(state.team.id, existing.id, data);
+      else await teams.addBattle(state.team.id, data);
+      await refreshTeam();
+      modal.close();
+      renderTeam($("#main"));
+      toast("Saved.");
+    } catch (err) { console.error(err); toast(err.message || "Could not save.", "err"); }
+  });
+  modal.open(existing ? "Edit team battle" : "Log team battle", form);
+}
+
+function teamEvents(panel) {
+  const rows = state.teamEvents;
+  panel.innerHTML = `
+    <div class="row-between">
+      <p class="muted small">Tournaments your team entered as a squad.</p>
+      <button class="btn btn-primary btn-sm" id="add-event">+ Add team event</button>
+    </div>
+    ${rows.length === 0 ? `<div class="empty">No team events yet.</div>` : `
+    <div class="card-list">
+      ${rows.map((ev) => `<article class="card">
+        <div class="card-main">
+          <h3>${esc(ev.name || "Untitled event")}</h3>
+          <p class="muted">${fmtDate(ev.date)}${ev.location ? " · " + esc(ev.location) : ""}${ev.format ? " · " + esc(ev.format) : ""}</p>
+          <div class="chips">
+            ${ev.placement ? `<span class="chip chip--accent">${esc(ordinalMaybe(ev.placement))}</span>` : ""}
+            ${ev.wins != null || ev.losses != null ? `<span class="chip">${Number(ev.wins || 0)}–${Number(ev.losses || 0)}</span>` : ""}
+            ${ev.roster ? `<span class="chip">${esc(ev.roster)}</span>` : ""}
+          </div>
+          ${ev.notes ? `<p class="card-notes">${esc(ev.notes)}</p>` : ""}
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-ghost btn-sm" data-edit="${ev.id}">Edit</button>
+          <button class="btn btn-ghost btn-sm danger" data-del="${ev.id}">Delete</button>
+        </div>
+      </article>`).join("")}
+    </div>`}
+  `;
+  $("#add-event").addEventListener("click", () => teamEventForm());
+  $$("[data-edit]", panel).forEach((b) =>
+    b.addEventListener("click", () => teamEventForm(state.teamEvents.find((x) => x.id === b.dataset.edit)))
+  );
+  $$("[data-del]", panel).forEach((b) =>
+    b.addEventListener("click", () => confirmTeamAction(
+      "Delete event", "Delete this team event?",
+      async () => { await teams.removeEvent(state.team.id, b.dataset.del); await refreshTeam(); renderTeam($("#main")); toast("Event deleted."); }
+    ))
+  );
+}
+
+function teamEventForm(existing) {
+  const { form, values } = buildForm([
+    { name: "name", label: "Event name", required: true, placeholder: "Regional Team Cup" },
+    { name: "date", label: "Date", type: "date", default: today() },
+    { name: "location", label: "Location" },
+    { name: "format", label: "Format", type: "select", options: ["3v3", "5v5", "Team Swiss", "Other"].map((v) => ({ value: v, label: v })) },
+    { name: "placement", label: "Team placement (number)", type: "number", min: 1 },
+    { name: "wins", label: "Wins", type: "number", min: 0 },
+    { name: "losses", label: "Losses", type: "number", min: 0 },
+    { name: "roster", label: "Roster (names)", placeholder: "Bird, Rin, Ohtori" },
+    { name: "notes", label: "Notes", type: "textarea" },
+  ], existing || {});
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    const data = {
+      name: v.name.trim(), date: v.date || "", location: v.location.trim(), format: v.format,
+      placement: v.placement === "" ? null : Number(v.placement),
+      wins: v.wins === "" ? null : Number(v.wins),
+      losses: v.losses === "" ? null : Number(v.losses),
+      roster: v.roster.trim(), notes: v.notes.trim(), createdByName: displayName(),
+    };
+    try {
+      if (existing) await teams.updateEvent(state.team.id, existing.id, data);
+      else await teams.addEvent(state.team.id, data);
+      await refreshTeam();
+      modal.close();
+      renderTeam($("#main"));
+      toast("Saved.");
+    } catch (err) { console.error(err); toast(err.message || "Could not save.", "err"); }
+  });
+  modal.open(existing ? "Edit team event" : "Add team event", form);
+}
+
+function teamAbout(panel) {
+  const t = state.team;
+  const owner = isTeamOwner();
+  panel.innerHTML = `
+    <section class="panel">
+      <h2>Team info</h2>
+      <dl class="kv">
+        <dt>Name</dt><dd>${esc(t.name)}</dd>
+        <dt>Tag</dt><dd>${esc(t.tag || "—")}</dd>
+        <dt>Region</dt><dd>${esc(t.region || "—")}</dd>
+        <dt>Founded</dt><dd>${esc(t.founded || "—")}</dd>
+        <dt>Invite code</dt><dd><code>${esc(t.inviteCode)}</code></dd>
+      </dl>
+      ${t.bio ? `<p class="card-notes">${esc(t.bio)}</p>` : ""}
+    </section>
+    <div class="row-between">
+      ${owner ? `<button class="btn btn-ghost btn-sm" id="edit-team">Edit team</button>
+                 <button class="btn btn-ghost btn-sm" id="new-code">Regenerate invite code</button>
+                 <button class="btn btn-ghost btn-sm danger" id="del-team">Delete team</button>`
+              : `<button class="btn btn-ghost btn-sm danger" id="leave-team">Leave team</button>`}
+    </div>
+  `;
+  if (owner) {
+    $("#edit-team").addEventListener("click", () => teamForm(t));
+    $("#new-code").addEventListener("click", () => confirmTeamAction(
+      "Regenerate code", "The old invite code stops working immediately. Continue?",
+      async () => { await teams.regenerateCode(t.id, t.inviteCode); await refreshTeam(); renderTeam($("#main")); toast("New invite code generated."); }
+    ));
+    $("#del-team").addEventListener("click", () => confirmTeamAction(
+      "Delete team", "This permanently deletes the team, its roster, battles and events for everyone. This can't be undone.",
+      async () => {
+        await teams.deleteTeam(t.id);
+        await store.setOne("profile", "main", { teamId: "" });
+        state.profile.teamId = "";
+        await refreshTeam();
+        renderTeam($("#main"));
+        toast("Team deleted.");
+      }
+    ));
+  } else {
+    $("#leave-team").addEventListener("click", () => confirmTeamAction(
+      "Leave team", "Leave this team? Your personal journey data stays with you.",
+      async () => {
+        await teams.leaveTeam(t.id);
+        await store.setOne("profile", "main", { teamId: "" });
+        state.profile.teamId = "";
+        await refreshTeam();
+        renderTeam($("#main"));
+        toast("You left the team.");
+      }
+    ));
+  }
+}
+
+function renderTeamJoin(main) {
+  main.innerHTML = `
+    <div class="view-head"><h1>Team</h1></div>
+    <div class="panel-row">
+      <section class="panel">
+        <h2>Join a team</h2>
+        <p class="muted small">Ask a teammate for the 6-character invite code.</p>
+        <form id="join-form" class="entry-form">
+          <label class="field"><span>Invite code</span><input id="join-code" maxlength="6" placeholder="ABC123" style="text-transform:uppercase" required /></label>
+          <div class="form-actions"><button class="btn btn-primary">Join team</button></div>
+        </form>
+      </section>
+      <section class="panel">
+        <h2>Start a team</h2>
+        <p class="muted small">You'll be the owner and get an invite code to share.</p>
+        <div class="form-actions"><button class="btn btn-primary" id="create-team">Create a team</button></div>
+      </section>
+    </div>
+  `;
+  $("#create-team").addEventListener("click", () => teamForm());
+  $("#join-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const code = $("#join-code").value;
+    try {
+      const teamId = await teams.joinTeam(code, displayName());
+      await store.setOne("profile", "main", { teamId });
+      state.profile.teamId = teamId;
+      await publishMyStats();
+      await refreshTeam();
+      state.teamTab = "roster";
+      renderTeam(main);
+      toast("Welcome to the team!");
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Could not join.", "err");
+    }
+  });
+}
+
+function teamForm(existing) {
+  const { form, values } = buildForm([
+    { name: "name", label: "Team name", required: true, placeholder: "Persona Studio" },
+    { name: "tag", label: "Tag (short)", placeholder: "PSN", default: "" },
+    { name: "region", label: "Region / city" },
+    { name: "founded", label: "Founded (year)", placeholder: "2025" },
+    { name: "color", label: "Accent colour", type: "color", default: "#2b7dff" },
+    { name: "bio", label: "Bio", type: "textarea", placeholder: "Who you are, how you roll…" },
+  ], existing || {});
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    const data = {
+      name: v.name.trim(), tag: v.tag.trim().toUpperCase().slice(0, 5),
+      region: v.region.trim(), founded: v.founded.trim(),
+      color: v.color || "#2b7dff", bio: v.bio.trim(),
+    };
+    try {
+      if (existing) {
+        await teams.updateTeam(existing.id, data);
+      } else {
+        const teamId = await teams.createTeam(data, displayName());
+        await store.setOne("profile", "main", { teamId });
+        state.profile.teamId = teamId;
+        await publishMyStats();
+        state.teamTab = "roster";
+      }
+      await refreshTeam();
+      modal.close();
+      renderTeam($("#main"));
+      toast(existing ? "Team updated." : "Team created.");
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Could not save team.", "err");
+    }
+  });
+  modal.open(existing ? "Edit team" : "Create a team", form);
+}
+
+function confirmTeamAction(title, message, run) {
+  const box = document.createElement("div");
+  box.innerHTML = `<p>${esc(message)}</p>
+    <div class="form-actions">
+      <button class="btn btn-ghost" data-cancel>Cancel</button>
+      <button class="btn btn-danger" data-go>Confirm</button>
+    </div>`;
+  box.querySelector("[data-cancel]").addEventListener("click", modal.close);
+  box.querySelector("[data-go]").addEventListener("click", async () => {
+    try { await run(); modal.close(); }
+    catch (err) { console.error(err); toast(err.message || "Action failed.", "err"); }
+  });
+  modal.open(title, box);
+}
+
+// ---------------------------------------------------------------------------
 // Shared save / delete
 // ---------------------------------------------------------------------------
 async function save(coll, existing, data) {
@@ -877,6 +1394,7 @@ async function save(coll, existing, data) {
     if (existing) await store.update(coll, existing.id, data);
     else await store.create(coll, data);
     await refresh();
+    if (coll === "matches" || coll === "tournaments") await publishMyStats();
     modal.close();
     render();
     toast("Saved.");

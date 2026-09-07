@@ -1,11 +1,76 @@
 rules_version = '2';
 
-// Paste these into: Firebase console -> Firestore Database -> Rules -> Publish
-// Every user can read and write only their own document subtree.
+// Paste into: Firebase console -> Firestore Database -> Rules -> Publish
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // ---- each user's private journey ---------------------------------
     match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if signedIn() && request.auth.uid == userId;
+    }
+
+    // ---- invite-code lookup ----------------------------------------
+    // Low-value: maps a short code to a teamId so a new member can find
+    // the team before they belong to it.
+    match /teamCodes/{code} {
+      allow read, create, delete: if signedIn();
+      allow update: if false;
+    }
+
+    // ---- teams (shared between members) ---------------------------
+    function teamData(teamId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data;
+    }
+    function isMember(teamId) {
+      return signedIn() && request.auth.uid in teamData(teamId).memberUids;
+    }
+
+    match /teams/{teamId} {
+      // any signed-in user may read basic team info (needed to join by code)
+      allow get, list: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.memberUids.hasOnly([request.auth.uid]);
+
+      allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
+
+      allow update: if signedIn() && (
+        // owner can change anything
+        resource.data.ownerUid == request.auth.uid
+        // a member may only add or remove THEMSELVES from the roster
+        || (
+          request.resource.data.ownerUid == resource.data.ownerUid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['memberUids', 'updatedAt'])
+          && request.resource.data.memberUids.hasOnly(
+               resource.data.memberUids.concat([request.auth.uid]))
+          && resource.data.memberUids.hasOnly(
+               request.resource.data.memberUids.concat([request.auth.uid]))
+        )
+      );
+
+      match /members/{memberUid} {
+        allow read: if isMember(teamId);
+        // you manage your own roster row; the owner can delete anyone's
+        allow create, update: if signedIn() && memberUid == request.auth.uid;
+        allow delete: if signedIn() && (
+          memberUid == request.auth.uid
+          || teamData(teamId).ownerUid == request.auth.uid
+        );
+      }
+
+      match /battles/{battleId} {
+        allow read, write: if isMember(teamId);
+      }
+
+      match /events/{eventId} {
+        allow read, write: if isMember(teamId);
+      }
     }
   }
 }

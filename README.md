@@ -14,8 +14,11 @@ match results, your parts collection, decks, and a stats dashboard. It's a stati
 | **Collection** | Owned Blades, Ratchets and Bits |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
+| **Profile** | Blader name, region, home store, main Bey, bio; JSON export of all your data |
+| **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 
-Each account's data is private and syncs across any device you sign in on.
+Each account's personal journey is private and syncs across any device you sign in on.
+Team data (roster, battles, events) is shared with everyone on that team.
 
 ---
 
@@ -32,6 +35,8 @@ Each account's data is private and syncs across any device you sign in on.
 - **Build → Authentication → Get started → Sign-in method →** enable **Email/Password**.
 - **Build → Firestore Database → Create database →** start in **production mode**, pick a location.
 - Open the **Rules** tab, paste the contents of [`firestore.rules`](firestore.rules), and **Publish**.
+  (Re-paste whenever `firestore.rules` changes in this repo — the Team feature added rules for
+  the shared `teams/` and `teamCodes/` collections.)
 
 ### 3. Add your config to the app
 
@@ -91,6 +96,7 @@ js/
   firebase-config.js   <-- you edit this
   firebase.js          Firebase init + re-exports (CDN, no build)
   store.js             Firestore CRUD, scoped to users/{uid}/...
+  teams.js             shared team data (teams/... and teamCodes/...)
   app.js               auth flow, views, forms, stats
 firestore.rules        security rules to paste into Firebase
 ```
@@ -98,10 +104,26 @@ firestore.rules        security rules to paste into Firebase
 ## Data model
 
 ```
+users/{uid}/profile/main      { bladerName, region, homeStore, mainBey, bio, teamId }
 users/{uid}/tournaments/{id}   { name, date, location, format, placement, wins, losses, notes }
 users/{uid}/matches/{id}       { date, tournamentId, opponent, myDeck, opponentDeck,
                                  games: [{ winner: "me"|"opp", finish: "Spin"|"Over"|"Burst"|"Xtreme" }],
                                  result, notes }
 users/{uid}/beys/{id}          { type: "Blade"|"Ratchet"|"Bit", name, notes }
 users/{uid}/decks/{id}         { name, combos: [{ blade, ratchet, bit }], notes }
+
+teamCodes/{CODE}              { teamId }                       // invite-code lookup
+teams/{teamId}               { name, tag, region, color, bio, founded,
+                               ownerUid, memberUids: [uid], inviteCode }
+teams/{teamId}/members/{uid} { bladerName, role, stats: { matchW, matchL, gameW, gameL,
+                               tournaments, bestPlacement } }
+teams/{teamId}/battles/{id}  { date, opponentTeam, format, event,
+                               lineup: [{ player, result: "W"|"L", opponent }],
+                               teamResult, notes }
+teams/{teamId}/events/{id}   { name, date, location, format, placement, wins, losses,
+                               roster, notes }
 ```
+
+Members publish their aggregate record to `teams/{teamId}/members/{uid}.stats` whenever
+they log a match or tournament, so the leaderboard stays current without exposing each
+member's private match log.
