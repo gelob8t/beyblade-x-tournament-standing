@@ -558,10 +558,13 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
 }
 
 @media (max-width: 460px) {
-  .stat-grid { grid-template-columns: 1fr; }
   .game-edit-row { grid-template-columns: 1fr 1fr auto; }
   .auth-card { padding: 1.5rem 1.25rem; }
   .brand-x { width: 48px; height: 48px; font-size: 1.6rem; }
   .brand h1 { font-size: 1.15rem; }
   h1 { font-size: 1.35rem; }
+}
+
+@media (max-width: 360px) {
+  .stat-grid { grid-template-columns: 1fr; }
 }
