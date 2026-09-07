@@ -19,6 +19,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |
 | **Friends activity** | Dashboard feed of friends' recent matches / placements — shown only for friends who set their activity to **Public** (Edit profile → Match activity visibility; default Private) |
 | **Live scoring** | Full-screen, big-button mode to score a match at the table — tap who won each game, pick the finish, first to 4 points, save straight to Matches |
+| **Achievements** | 19 badges from your data (milestones, streaks, finishes, collection, social); progress bars on locked ones; unlock toast; count shown on your profile card |
 
 Works **offline** (IndexedDB cache): reads come from the local cache, writes queue
 and sync when you reconnect. Deletes are instant with a 6-second **Undo**.

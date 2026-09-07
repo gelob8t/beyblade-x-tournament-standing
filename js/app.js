@@ -15,7 +15,7 @@ import * as teams from "./teams.js";
 import * as friends from "./friends.js";
 import {
   FINISHES, finishLabel, finishPts,
-  matchScore, matchResult, ordinal, groupRecord, streaks,
+  matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
 } from "./stats.js";
 
 // ---------------------------------------------------------------------------
@@ -220,6 +220,7 @@ const state = {
   feed: [],
   openFriend: null,
   friendProfile: null,
+  achv: [],
   loaded: false,
 };
 
@@ -233,7 +234,35 @@ async function refresh() {
   ]);
   Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, loaded: true });
   await Promise.all([refreshTeam(), refreshFriends()]);
+  computeAchievements();
   publishPresence();
+}
+
+const ACHV_SEEN_KEY = "bbx_achv_seen";
+
+function computeAchievements() {
+  state.achv = achievements({
+    matches: state.matches,
+    tournaments: state.tournaments,
+    beys: state.beys,
+    decks: state.decks,
+    friendsCount: state.friends.length,
+    hasTeam: !!state.team,
+  });
+  const doneIds = state.achv.filter((a) => a.done).map((a) => a.id);
+  let seen;
+  try { seen = JSON.parse(localStorage.getItem(ACHV_SEEN_KEY) || "null"); } catch { seen = null; }
+  if (!Array.isArray(seen)) {
+    // first run — remember what's already earned, don't celebrate retroactively
+    try { localStorage.setItem(ACHV_SEEN_KEY, JSON.stringify(doneIds)); } catch { /* ignore */ }
+    return;
+  }
+  const fresh = state.achv.filter((a) => a.done && !seen.includes(a.id));
+  if (fresh.length) {
+    const first = fresh[0];
+    toast(`${first.icon} Achievement unlocked: ${first.name}${fresh.length > 1 ? ` (+${fresh.length - 1} more)` : ""}`);
+    try { localStorage.setItem(ACHV_SEEN_KEY, JSON.stringify(doneIds)); } catch { /* ignore */ }
+  }
 }
 
 async function refreshFriends() {
@@ -355,6 +384,7 @@ async function publishPresence() {
       mainBey: state.profile.mainBey || "",
       bio: state.profile.bio || "",
       feedVisibility: state.profile.feedVisibility === "public" ? "public" : "private",
+      achvDone: (state.achv || []).filter((a) => a.done).length,
       stats,
     });
   } catch (err) {
@@ -799,21 +829,23 @@ function renderDashboard(main) {
 
     ${feedPanel()}
 
-    ${played.length === 0
-      ? onboardingPanel()
-      : `<section class="panel">
-          <div class="row-between" style="margin-bottom:.6rem">
-            <h2 style="margin:0">Recent form</h2>
-            <button class="btn btn-ghost btn-sm" id="go-stats">Full stats →</button>
-          </div>
-          <div class="form-pills">
-            ${recent.map((m) => `<span class="pill pill--${matchResult(m) === "W" ? "w" : "l"}" title="${esc(m.opponent || "?")} · ${fmtDate(m.date)}">${matchResult(m)}</span>`).join("")}
-          </div>
-        </section>`}
+    ${played.length === 0 ? onboardingPanel() : `
+      <section class="panel">
+        <div class="row-between" style="margin-bottom:.6rem">
+          <h2 style="margin:0">Recent form</h2>
+          <button class="btn btn-ghost btn-sm" id="go-stats">Full stats →</button>
+        </div>
+        <div class="form-pills">
+          ${recent.map((m) => `<span class="pill pill--${matchResult(m) === "W" ? "w" : "l"}" title="${esc(m.opponent || "?")} · ${fmtDate(m.date)}">${matchResult(m)}</span>`).join("")}
+        </div>
+      </section>
+      ${achvPanel(true)}`}
   `;
   wireFeedClicks(main);
   const gs = $("#go-stats");
   if (gs) gs.addEventListener("click", () => switchView("stats"));
+  const ga = $("#go-achv");
+  if (ga) ga.addEventListener("click", () => switchView("stats"));
   $$("[data-goto]", main).forEach((b) =>
     b.addEventListener("click", () => {
       const v = b.dataset.goto;
@@ -858,6 +890,40 @@ function statCard(label, value, sub) {
   return `<div class="stat-card"><span class="stat-label">${esc(label)}</span>
     <span class="stat-value">${esc(value)}</span>
     <span class="stat-sub">${esc(sub)}</span></div>`;
+}
+
+function achvPanel(compact) {
+  const list = state.achv || [];
+  const done = list.filter((a) => a.done);
+  const total = list.length;
+
+  if (compact) {
+    if (!done.length) return "";
+    const recent = done.slice(-8);
+    return `<section class="panel">
+      <div class="row-between" style="margin-bottom:.6rem">
+        <h2 style="margin:0">Achievements <span class="muted">${done.length}/${total}</span></h2>
+        <button class="btn btn-ghost btn-sm" id="go-achv">See all →</button>
+      </div>
+      <div class="achv-row">${recent.map((a) => `<span class="achv-chip" title="${esc(a.name)} — ${esc(a.desc)}">${a.icon}</span>`).join("")}</div>
+    </section>`;
+  }
+
+  return `<section class="panel">
+    <h2>Achievements <span class="muted">${done.length}/${total}</span></h2>
+    <div class="achv-grid">
+      ${list.map((a) => `<div class="achv${a.done ? "" : " achv--locked"}">
+        <span class="achv-icon">${a.icon}</span>
+        <div class="achv-body">
+          <div class="achv-name">${esc(a.name)}</div>
+          <div class="muted small">${esc(a.desc)}</div>
+          ${a.progress ? `<div class="achv-bar"><span style="width:${Math.round((a.progress.have / a.progress.need) * 100)}%"></span></div>
+            <div class="muted small">${a.progress.have} / ${a.progress.need}</div>` : ""}
+        </div>
+        ${a.done ? `<span class="achv-tick">✓</span>` : ""}
+      </div>`).join("")}
+    </div>
+  </section>`;
 }
 
 function feedPanel() {
@@ -923,7 +989,8 @@ function renderStats(main) {
 
   if (played.length === 0) {
     main.innerHTML = `<div class="view-head"><h1>Stats</h1></div>
-      <div class="empty">Log a few matches and your stats will build up here.</div>`;
+      <div class="empty">Log a few matches and your stats will build up here.</div>
+      ${achvPanel(false)}`;
     return;
   }
 
@@ -989,6 +1056,8 @@ function renderStats(main) {
     ${recordTable("Your decks", myDeck, "Deck")}
     ${recordTable("Head-to-head", h2h, "Opponent")}
     ${vsDeck.length ? recordTable("Vs. opponent bey / deck", vsDeck, "Their bey") : ""}
+
+    ${achvPanel(false)}
   `;
 }
 
@@ -2336,6 +2405,7 @@ function renderFriendProfile(main) {
       ${statCard("Match win rate", mRate + "%", `${mw}W – ${ml}L`)}
       ${statCard("Game win rate", gRate + "%", `${gw}W – ${gl}L games`)}
       ${statCard("Tournaments", Number(s.tournaments || 0), s.bestPlacement ? `Best finish: ${ordinal(s.bestPlacement)}` : "No placements")}
+      ${c.achvDone != null ? statCard("Achievements", Number(c.achvDone), "badges earned") : ""}
     </div>
 
     <section class="panel">
@@ -2422,6 +2492,7 @@ async function save(coll, existing, data) {
   }
 
   patchLocalDoc(coll, id, data, isNew);
+  computeAchievements();
   if (isNew) postActivity(coll, id, data);
   publishPresence();
   modal.close();

@@ -58,3 +58,57 @@ export function streaks(chronMatches) {
   }
   return { current: Math.abs(run), type: run > 0 ? "win" : run < 0 ? "loss" : "", longestWin: longestW };
 }
+
+function achv(id, icon, name, desc, done, have, need) {
+  const a = { id, icon, name, desc, done: !!done };
+  if (need && !done && have != null) a.progress = { have: Math.max(0, Math.min(have, need)), need };
+  return a;
+}
+
+/**
+ * Derive the achievement list from a user's data.
+ * @param {{matches?:array, tournaments?:array, beys?:array, decks?:array,
+ *          friendsCount?:number, hasTeam?:boolean}} d
+ */
+export function achievements(d = {}) {
+  const matches = d.matches || [];
+  const tournaments = d.tournaments || [];
+  const beys = d.beys || [];
+  const decks = d.decks || [];
+
+  const played = matches.filter((m) => matchResult(m) !== "—");
+  const wins = played.filter((m) => matchResult(m) === "W").length;
+  const winRate = played.length ? wins / played.length : 0;
+  const chron = [...played].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  const { longestWin } = streaks(chron);
+
+  const fin = {};
+  for (const m of matches) for (const g of m.games || []) {
+    if (g.winner === "me") fin[g.finish] = (fin[g.finish] || 0) + 1;
+  }
+  const distinctFinishes = ["Spin", "Over", "Burst", "Xtreme"].filter((k) => fin[k] > 0).length;
+
+  const placements = tournaments.map((t) => Number(t.placement)).filter((n) => n > 0);
+
+  return [
+    achv("first-match", "🎬", "First blood", "Log your first match", played.length >= 1, played.length, 1),
+    achv("ten-matches", "🔟", "Getting serious", "Log 10 matches", matches.length >= 10, matches.length, 10),
+    achv("fifty-matches", "5️⃣0️⃣", "Grinder", "Log 50 matches", matches.length >= 50, matches.length, 50),
+    achv("hundred", "💯", "Centurion", "Log 100 matches", matches.length >= 100, matches.length, 100),
+    achv("first-tournament", "🏟️", "Tournament debut", "Log your first tournament", tournaments.length >= 1, tournaments.length, 1),
+    achv("podium", "🥉", "On the podium", "Finish top 3 in a tournament", placements.some((p) => p <= 3)),
+    achv("win-tournament", "🏆", "Winner's circle", "Finish 1st in a tournament", placements.some((p) => p === 1)),
+    achv("streak5", "🔥", "Hot streak", "Win 5 matches in a row", longestWin >= 5, longestWin, 5),
+    achv("streak10", "⚡", "On fire", "Win 10 matches in a row", longestWin >= 10, longestWin, 10),
+    achv("winrate", "📈", "Above the curve", "Hold a 60%+ win rate over 20+ matches", played.length >= 20 && winRate >= 0.6),
+    achv("xtreme1", "🚀", "Xtreme", "Score your first Xtreme Finish", (fin.Xtreme || 0) >= 1),
+    achv("spin10", "🌀", "Spin doctor", "Score 10 Spin Finishes", (fin.Spin || 0) >= 10, fin.Spin || 0, 10),
+    achv("burst10", "💥", "Burst artist", "Score 10 Burst Finishes", (fin.Burst || 0) >= 10, fin.Burst || 0, 10),
+    achv("all-finishes", "🎯", "Full kit", "Score all four finish types", distinctFinishes >= 4, distinctFinishes, 4),
+    achv("collector", "🧰", "Collector", "Own 15 parts", beys.length >= 15, beys.length, 15),
+    achv("deck1", "🃏", "Deck builder", "Build your first deck", decks.length >= 1, decks.length, 1),
+    achv("deck3", "🗂️", "Three decks deep", "Build 3 decks", decks.length >= 3, decks.length, 3),
+    achv("friend", "🤝", "Made a friend", "Add your first friend", (d.friendsCount || 0) >= 1),
+    achv("team", "👥", "Team player", "Join or create a team", !!d.hasTeam),
+  ];
+}

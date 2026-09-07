@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  finishPts, matchScore, matchResult, ordinal, groupRecord, streaks,
+  finishPts, matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
 } from "../js/stats.js";
 
 const G = (winner, finish) => ({ winner, finish });
@@ -82,4 +82,36 @@ test("streaks: unrated matches don't break the run", () => {
   const s = streaks([{ result: "W" }, { games: [] }, { result: "W" }]);
   assert.equal(s.current, 2);
   assert.equal(s.type, "win");
+});
+
+test("achievements: empty state has nothing earned", () => {
+  const all = achievements({});
+  assert.ok(all.length >= 15);
+  assert.equal(all.filter((a) => a.done).length, 0);
+  assert.ok(all.find((a) => a.id === "first-match").progress);
+});
+
+test("achievements: milestones + streak + finishes unlock", () => {
+  const matches = [];
+  for (let i = 0; i < 12; i++) matches.push({ result: "W", games: [{ winner: "me", finish: "Xtreme" }] });
+  const a = achievements({
+    matches,
+    tournaments: [{ placement: 1 }],
+    beys: Array(15).fill({}),
+    decks: [{}, {}, {}],
+    friendsCount: 2,
+    hasTeam: true,
+  });
+  const done = new Set(a.filter((x) => x.done).map((x) => x.id));
+  for (const id of ["first-match", "ten-matches", "first-tournament", "win-tournament", "podium",
+    "streak5", "streak10", "xtreme1", "collector", "deck1", "deck3", "friend", "team"]) {
+    assert.ok(done.has(id), `expected ${id} unlocked`);
+  }
+  assert.ok(!done.has("hundred"));
+});
+
+test("achievements: full-kit needs all four finish types", () => {
+  const games = ["Spin", "Over", "Burst", "Xtreme"].map((f) => ({ winner: "me", finish: f }));
+  const a = achievements({ matches: [{ result: "W", games }] });
+  assert.ok(a.find((x) => x.id === "all-finishes").done);
 });
