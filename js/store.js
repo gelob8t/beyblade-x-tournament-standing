@@ -6,7 +6,9 @@ import {
   collection,
   doc,
   addDoc,
+  getDoc,
   getDocs,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -50,4 +52,19 @@ export async function update(name, id, data) {
 /** Delete a document. */
 export async function remove(name, id) {
   await deleteDoc(doc(db, "users", uid(), name, id));
+}
+
+/** Read a single document by id; returns null if it doesn't exist. */
+export async function getOne(name, id) {
+  const snap = await getDoc(doc(db, "users", uid(), name, id));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/** Create-or-merge a single document at a known id. */
+export async function setOne(name, id, data) {
+  await setDoc(
+    doc(db, "users", uid(), name, id),
+    { ...data, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
 }

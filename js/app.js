@@ -130,17 +130,40 @@ const state = {
   matches: [],
   beys: [],
   decks: [],
+  profile: {},
   loaded: false,
 };
 
 async function refresh() {
-  const [tournaments, matches, beys, decks] = await Promise.all([
+  const [tournaments, matches, beys, decks, profile] = await Promise.all([
     store.list("tournaments"),
     store.list("matches"),
     store.list("beys"),
     store.list("decks"),
+    store.getOne("profile", "main"),
   ]);
-  Object.assign(state, { tournaments, matches, beys, decks, loaded: true });
+  Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, loaded: true });
+}
+
+function initials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "–";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function displayName() {
+  return state.profile.bladerName || (auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "Blader";
+}
+
+function syncProfileChrome() {
+  const name = displayName();
+  state.userName = name;
+  $("#avatar").textContent = initials(name);
+  $("#avatar-lg").textContent = initials(name);
+  $("#profile-name").textContent = name;
+  $("#pm-name").textContent = name;
+  $("#pm-email").textContent = (auth.currentUser && auth.currentUser.email) || "";
 }
 
 // ---------------------------------------------------------------------------
@@ -222,10 +245,113 @@ function friendlyAuthError(err) {
 // App shell
 // ---------------------------------------------------------------------------
 function initShell() {
-  $("#sign-out").addEventListener("click", () => signOut(auth));
   $$("#tabs .tab").forEach((t) =>
     t.addEventListener("click", () => switchView(t.dataset.view))
   );
+  initProfileMenu();
+}
+
+// ---------------------------------------------------------------------------
+// Profile menu
+// ---------------------------------------------------------------------------
+function initProfileMenu() {
+  const btn = $("#profile-btn");
+  const menu = $("#profile-menu");
+
+  const setOpen = (open) => {
+    menu.hidden = !open;
+    btn.setAttribute("aria-expanded", String(open));
+  };
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setOpen(menu.hidden);
+  });
+  document.addEventListener("click", (e) => {
+    if (!menu.hidden && !menu.contains(e.target)) setOpen(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !menu.hidden) setOpen(false);
+  });
+
+  menu.addEventListener("click", async (e) => {
+    const act = e.target.closest("button")?.dataset.act;
+    if (!act) return;
+    setOpen(false);
+    if (act === "edit") profileForm();
+    else if (act === "export") exportData();
+    else if (act === "signout") signOut(auth);
+    else if (act === "reset") {
+      const email = auth.currentUser?.email;
+      if (!email) return;
+      try {
+        await sendPasswordResetEmail(auth, email);
+        toast("Password reset email sent to " + email);
+      } catch (err) {
+        toast(friendlyAuthError(err), "err");
+      }
+    }
+  });
+}
+
+function profileForm() {
+  const p = state.profile || {};
+  const { form, values } = buildForm([
+    { name: "bladerName", label: "Blader name", required: true, placeholder: "e.g. Bird", default: displayName() },
+    { name: "region", label: "Region / city", placeholder: "Metro Manila" },
+    { name: "homeStore", label: "Home store / club", placeholder: "Where you usually play" },
+    { name: "mainBey", label: "Main Bey", placeholder: "e.g. Dran Sword 3-60F" },
+    { name: "bio", label: "Bio / goals", type: "textarea", placeholder: "This season I want to…" },
+  ], p);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = values();
+    const data = {
+      bladerName: v.bladerName.trim(),
+      region: v.region.trim(),
+      homeStore: v.homeStore.trim(),
+      mainBey: v.mainBey.trim(),
+      bio: v.bio.trim(),
+    };
+    try {
+      await store.setOne("profile", "main", data);
+      if (data.bladerName && auth.currentUser && auth.currentUser.displayName !== data.bladerName) {
+        try { await updateProfile(auth.currentUser, { displayName: data.bladerName }); } catch { /* non-fatal */ }
+      }
+      state.profile = { ...state.profile, ...data };
+      syncProfileChrome();
+      modal.close();
+      render();
+      toast("Profile updated.");
+    } catch (err) {
+      console.error(err);
+      toast(err.message || "Could not save profile.", "err");
+    }
+  });
+  modal.open("Edit profile", form);
+}
+
+function exportData() {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    account: { email: auth.currentUser?.email || null, uid: auth.currentUser?.uid || null },
+    profile: state.profile || {},
+    tournaments: state.tournaments,
+    matches: state.matches,
+    beys: state.beys,
+    decks: state.decks,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `beyblade-x-journey-${today()}.json`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast("Export downloaded.");
 }
 
 function switchView(view) {
@@ -302,10 +428,22 @@ function renderDashboard(main) {
 
   const pct = (n, d) => (d ? Math.round((n / d) * 100) : 0);
 
+  const prof = state.profile || {};
+  const idMeta = [prof.region, prof.homeStore].filter(Boolean).join(" · ");
+
   main.innerHTML = `
     <div class="view-head">
       <h1>Dashboard</h1>
-      <p class="muted">${state.userName ? esc(state.userName) + " · " : ""}${matches.length} matches · ${tournaments.length} tournaments</p>
+      <p class="muted">${matches.length} matches · ${tournaments.length} tournaments</p>
+    </div>
+
+    <div class="identity">
+      <span class="avatar">${esc(initials(displayName()))}</span>
+      <div>
+        <div class="identity-name">${esc(displayName())}</div>
+        <div class="identity-meta">${esc(idMeta || "Add your details from the profile menu")}</div>
+      </div>
+      ${prof.mainBey ? `<div class="identity-main"><span>Main Bey</span><b>${esc(prof.mainBey)}</b></div>` : ""}
     </div>
 
     <div class="stat-grid">
@@ -787,11 +925,10 @@ if (!isConfigured) {
   onAuthStateChanged(auth, async (user) => {
     $("#app-loading").hidden = true;
     if (user) {
-      state.userName = user.displayName || user.email;
-      $("#user-label").textContent = state.userName;
       $("#auth-view").hidden = true;
       $("#shell").hidden = false;
       state.loaded = false;
+      syncProfileChrome();
       render();
       try {
         await refresh();
@@ -799,6 +936,7 @@ if (!isConfigured) {
         console.error(err);
         toast("Could not load data. Check your Firestore rules.", "err");
       }
+      syncProfileChrome();
       render();
     } else {
       state.loaded = false;
