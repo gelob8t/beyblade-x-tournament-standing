@@ -1029,14 +1029,26 @@ function recordTable(title, rows, col) {
 // ---------------------------------------------------------------------------
 // Tournaments
 // ---------------------------------------------------------------------------
+let tournamentQuery = "";
+
 function renderTournaments(main) {
-  const rows = [...state.tournaments].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const all = [...state.tournaments].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const q = tournamentQuery.trim().toLowerCase();
+  const rows = q
+    ? all.filter((t) => `${t.name || ""} ${t.location || ""} ${t.format || ""} ${t.notes || ""}`.toLowerCase().includes(q))
+    : all;
   main.innerHTML = `
     <div class="view-head">
       <h1>Tournaments</h1>
       <button class="btn btn-primary" id="add-tournament">+ Add tournament</button>
     </div>
-    ${rows.length === 0 ? `<div class="empty">No tournaments yet.</div>` : `
+    ${all.length === 0 ? "" : `
+    <div class="filter-bar">
+      <input id="tq" placeholder="Search name / location / notes" value="${esc(tournamentQuery)}" />
+      ${q ? `<button class="btn-link" id="tq-clear">clear</button>` : ""}
+    </div>`}
+    ${all.length === 0 ? `<div class="empty">No tournaments yet.</div>`
+      : rows.length === 0 ? `<div class="empty">No tournaments match that search.</div>` : `
     <div class="card-list">
       ${rows.map((t) => {
         const mCount = state.matches.filter((m) => m.tournamentId === t.id).length;
@@ -1066,6 +1078,13 @@ function renderTournaments(main) {
   $$("[data-del]", main).forEach((b) =>
     b.addEventListener("click", () => confirmDelete("tournaments", b.dataset.del, "tournament"))
   );
+  const tq = $("#tq");
+  if (tq) tq.addEventListener("input", debounce((e) => {
+    tournamentQuery = e.target.value; render();
+    const el = $("#tq"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+  }, 200));
+  const tqc = $("#tq-clear");
+  if (tqc) tqc.addEventListener("click", () => { tournamentQuery = ""; render(); });
 }
 
 function ordinalMaybe(p) {
@@ -1107,14 +1126,49 @@ function tournamentForm(existing) {
 // ---------------------------------------------------------------------------
 // Matches
 // ---------------------------------------------------------------------------
+const matchFilter = { q: "", result: "", deck: "" };
+
 function renderMatches(main) {
-  const rows = [...state.matches].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const all = [...state.matches].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const decks = [...new Set(all.map((m) => m.myDeck).filter(Boolean))];
+  const f = matchFilter;
+  const q = f.q.trim().toLowerCase();
+  const rows = all.filter((m) => {
+    if (f.result && matchResult(m) !== f.result) return false;
+    if (f.deck && (m.myDeck || "") !== f.deck) return false;
+    if (q) {
+      const hay = `${m.opponent || ""} ${m.opponentDeck || ""} ${m.notes || ""}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+  const last = all[0];
+
   main.innerHTML = `
     <div class="view-head">
       <h1>Matches</h1>
-      <button class="btn btn-primary" id="add-match">+ Log match</button>
+      <div class="head-actions">
+        ${last ? `<button class="btn btn-ghost" id="repeat-match">Repeat last</button>` : ""}
+        <button class="btn btn-primary" id="add-match">+ Log match</button>
+      </div>
     </div>
-    ${rows.length === 0 ? `<div class="empty">No matches logged yet.</div>` : `
+    ${all.length === 0 ? "" : `
+    <div class="filter-bar">
+      <input id="mf-q" placeholder="Search opponent / deck / notes" value="${esc(f.q)}" />
+      <select id="mf-result">
+        <option value="">All results</option>
+        <option value="W"${f.result === "W" ? " selected" : ""}>Wins</option>
+        <option value="L"${f.result === "L" ? " selected" : ""}>Losses</option>
+      </select>
+      ${decks.length ? `<select id="mf-deck">
+        <option value="">All decks</option>
+        ${decks.map((d) => `<option value="${esc(d)}"${f.deck === d ? " selected" : ""}>${esc(d)}</option>`).join("")}
+      </select>` : ""}
+      ${(f.q || f.result || f.deck) ? `<button class="btn-link" id="mf-clear">clear</button>` : ""}
+    </div>`}
+    ${all.length === 0 ? `<div class="empty">No matches logged yet.</div>`
+      : rows.length === 0 ? `<div class="empty">No matches match that filter.</div>` : `
+    <p class="muted small">${rows.length} of ${all.length} match${all.length === 1 ? "" : "es"}</p>
     <div class="card-list">
       ${rows.map((m) => {
         const res = matchResult(m);
@@ -1142,15 +1196,35 @@ function renderMatches(main) {
     </div>`}
   `;
   $("#add-match").addEventListener("click", () => matchForm());
+  const rep = $("#repeat-match");
+  if (rep) rep.addEventListener("click", () => matchForm(null, last));
   $$("[data-edit]", main).forEach((b) =>
     b.addEventListener("click", () => matchForm(state.matches.find((m) => m.id === b.dataset.edit)))
   );
   $$("[data-del]", main).forEach((b) =>
     b.addEventListener("click", () => confirmDelete("matches", b.dataset.del, "match"))
   );
+
+  const rerender = () => { render(); };
+  const qEl = $("#mf-q");
+  if (qEl) qEl.addEventListener("input", debounce((e) => { matchFilter.q = e.target.value; rerender(); const el = $("#mf-q"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 200));
+  const rEl = $("#mf-result");
+  if (rEl) rEl.addEventListener("change", (e) => { matchFilter.result = e.target.value; rerender(); });
+  const dEl = $("#mf-deck");
+  if (dEl) dEl.addEventListener("change", (e) => { matchFilter.deck = e.target.value; rerender(); });
+  const cEl = $("#mf-clear");
+  if (cEl) cEl.addEventListener("click", () => { matchFilter.q = ""; matchFilter.result = ""; matchFilter.deck = ""; rerender(); });
 }
 
-function matchForm(existing) {
+function debounce(fn, ms) {
+  let t;
+  return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+}
+
+function matchForm(existing, template) {
+  const base = existing || (template
+    ? { date: today(), tournamentId: template.tournamentId || null, myDeck: template.myDeck || "" }
+    : {});
   const games = structuredClone(existing?.games || []);
 
   const deckOptions = [
@@ -1209,7 +1283,7 @@ function matchForm(existing) {
       { value: "", label: "Auto from games" }, { value: "W", label: "Win" }, { value: "L", label: "Loss" },
     ] },
     { name: "notes", label: "Notes", type: "textarea" },
-  ], existing || {});
+  ], base);
 
   bindSubmit(form, async () => {
     const v = values();
@@ -1226,7 +1300,7 @@ function matchForm(existing) {
     };
     await save("matches", existing, data);
   });
-  modal.open(existing ? "Edit match" : "Log match", form);
+  modal.open(existing ? "Edit match" : template ? "Log match (repeat)" : "Log match", form);
 }
 
 // ---------------------------------------------------------------------------
@@ -2143,9 +2217,10 @@ function historyItem(x) {
 // ---------------------------------------------------------------------------
 async function save(coll, existing, data) {
   try {
+    let id = existing?.id;
     if (existing) await store.update(coll, existing.id, data);
-    else await store.create(coll, data);
-    if (!existing) await postActivity(coll, data);
+    else id = await store.create(coll, data);
+    if (!existing) await postActivity(coll, id, data);
     await refresh();  // refresh() re-publishes the player card + team stats
     modal.close();
     render();
@@ -2157,14 +2232,14 @@ async function save(coll, existing, data) {
 }
 
 /** Add a feed item when a new match / placed tournament is logged. Best-effort. */
-async function postActivity(coll, data) {
+async function postActivity(coll, srcId, data) {
   try {
     if (coll === "matches") {
       const res = matchResult(data);
       if (res !== "W" && res !== "L") return;
       const { mine, opp } = matchScore(data);
       await friends.addActivity({
-        kind: "match",
+        kind: "match", srcId,
         result: res,
         opponent: data.opponent || "",
         myScore: mine, oppScore: opp,
@@ -2173,7 +2248,7 @@ async function postActivity(coll, data) {
       });
     } else if (coll === "tournaments" && Number(data.placement) > 0) {
       await friends.addActivity({
-        kind: "tournament",
+        kind: "tournament", srcId,
         name: data.name || "",
         placement: Number(data.placement),
         wins: data.wins == null ? null : Number(data.wins),
@@ -2197,6 +2272,9 @@ function confirmDelete(coll, id, noun) {
   box.querySelector("[data-go]").addEventListener("click", (e) =>
     runBtn(e.currentTarget, "Deleting…", async () => {
       await store.remove(coll, id);
+      if (coll === "matches" || coll === "tournaments") {
+        await friends.deleteActivityForSource(id).catch(() => {});
+      }
       await refresh();
       modal.close();
       render();

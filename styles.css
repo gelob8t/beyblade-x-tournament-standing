@@ -244,6 +244,15 @@ textarea { resize: vertical; }
   color: #fff; background: var(--red); border-radius: 999px;
 }
 
+/* ---------- filter bar ---------- */
+.filter-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-bottom: .9rem;
+}
+.filter-bar input { flex: 1 1 200px; }
+.filter-bar select { flex: 0 1 auto; width: auto; }
+.filter-bar .btn-link { flex: none; }
+
 /* ---------- onboarding ---------- */
 .ob-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .ob-step { display: flex; align-items: center; gap: .6rem; }

@@ -137,6 +137,15 @@ export async function addActivity(item) {
   });
 }
 
+/** Remove feed items that were generated from a now-deleted match/tournament. */
+export async function deleteActivityForSource(srcId) {
+  if (!srcId) return;
+  const snap = await getDocs(
+    query(collection(db, "activity", uid(), "items"), where("srcId", "==", srcId))
+  );
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+}
+
 /** Read a friend's recent activity items (newest first). Throws if not
  *  allowed — caller should skip that friend. */
 export async function listActivity(ownerUid, max = 8) {
