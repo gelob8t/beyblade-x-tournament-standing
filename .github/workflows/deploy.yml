@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
 on:
   push:
@@ -15,13 +15,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Publish the Firestore security rules so they can't drift from the code.
+  # Needs a repo secret FIREBASE_TOKEN (run `npx firebase-tools login:ci`
+  # locally once and paste the token). Skipped automatically if unset.
+  firestore-rules:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Deploy Firestore rules
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -z "$FIREBASE_TOKEN" ]; then
+            echo "FIREBASE_TOKEN not set — skipping rules deploy."
+            echo "Paste firestore.rules into the Firebase console manually until you add the secret."
+            exit 0
+          fi
+          PROJECT=$(grep -oE 'projectId: *"[^"]+"' js/firebase-config.js | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Deploying rules to $PROJECT"
+          npx --yes firebase-tools@13 deploy --only firestore:rules --project "$PROJECT" --token "$FIREBASE_TOKEN" --non-interactive
+
+  pages:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp build id for cache-busting
+        run: |
+          SHA="${GITHUB_SHA::12}"
+          sed -i "s|\./styles.css\"|./styles.css?v=$SHA\"|" index.html
+          sed -i "s|\./js/app.js\"|./js/app.js?v=$SHA\"|" index.html
+          sed -i "s|register(\"\./sw.js\")|register(\"./sw.js?v=$SHA\")|" index.html
+          sed -i "s|__BUILD__|$SHA|" sw.js
+          # bust the whole ES-module graph so imports refetch too
+          for f in js/*.js; do
+            sed -i -E "s|from \"(\./[A-Za-z0-9_-]+\.js)\"|from \"\1?v=$SHA\"|g" "$f"
+          done
+          echo "Stamped build $SHA"
+
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

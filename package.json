@@ -1,5 +1,10 @@
 {
-  "dependencies": {
-    "firebase": "^12.18.0"
+  "name": "beyblade-x-tournament-standing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Static PWA for tracking a Beyblade X tournament journey. No build step — Firebase loads from CDN.",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "rules:deploy": "firebase deploy --only firestore:rules"
   }
 }
