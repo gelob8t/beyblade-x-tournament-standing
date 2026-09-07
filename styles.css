@@ -486,6 +486,17 @@ textarea { resize: vertical; }
 .lineup-edit-row { display: grid; grid-template-columns: 1fr .8fr 1fr auto; gap: .4rem; }
 @media (max-width: 520px) { .lineup-edit-row { grid-template-columns: 1fr; } }
 
+/* ---------- activity feed ---------- */
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: .1rem; }
+.feed-item {
+  display: flex; align-items: center; gap: .7rem;
+  padding: .6rem .2rem; border-bottom: 1px solid var(--bg-2);
+}
+.feed-item:last-child { border-bottom: none; }
+.feed-body { flex: 1; min-width: 0; }
+.feed-text { font-size: .9rem; line-height: 1.35; }
+.feed-text b { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; }
+
 /* ---------- friends ---------- */
 .friend-code {
   font-family: var(--font-display); font-size: 1.5rem; font-weight: 700;

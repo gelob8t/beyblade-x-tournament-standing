@@ -17,6 +17,7 @@ match results, your parts collection, decks, and a stats dashboard. It's a stati
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON export of all your data |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 | **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |
+| **Friends activity** | Dashboard feed of friends' recent matches / placements — shown only for friends who set their activity to **Public** (Edit profile → Match activity visibility; default Private) |
 
 Each account's personal journey is private and syncs across any device you sign in on.
 Team data (roster, battles, events) is shared with everyone on that team.
@@ -128,11 +129,15 @@ teams/{teamId}/battles/{id}  { date, opponentTeam, format, event,
 teams/{teamId}/events/{id}   { name, date, location, format, placement, wins, losses,
                                roster, notes }
 
-playerCards/{uid}            { bladerName, photo, region, teamName,
+playerCards/{uid}            { bladerName, photo, region, teamName, feedVisibility,
                                stats: { matchW, matchL, gameW, gameL, ... } }
 friendCodes/{CODE}           { uid }                    // add-by-code lookup
 friendRequests/{id}          { from, to, fromName, fromPhoto }   // exists = pending
 friendships/{a_b}            { uids: [a, b] }           // doc id = sorted uids
+activity/{uid}/items/{id}    { kind: "match"|"tournament", result, opponent,
+                               myScore, oppScore, deck, name, placement, at }
+                             // readable by a friend only if that user's
+                             // playerCard.feedVisibility == "public"
 ```
 
 Members publish their aggregate record to `teams/{teamId}/members/{uid}.stats` whenever

@@ -15,6 +15,8 @@ import {
   deleteDoc,
   query,
   where,
+  orderBy,
+  limit,
   serverTimestamp,
 } from "./firebase.js";
 
@@ -111,4 +113,23 @@ export async function dropRequest(reqId) {
 
 export async function removeFriend(otherUid) {
   await deleteDoc(doc(db, "friendships", pairKey(uid(), otherUid)));
+}
+
+// ---- activity feed ----
+
+/** Append an activity item to this user's own feed. */
+export async function addActivity(item) {
+  await addDoc(collection(db, "activity", uid(), "items"), {
+    ...item,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/** Read a friend's recent activity items (newest first). Throws if not
+ *  allowed — caller should skip that friend. */
+export async function listActivity(ownerUid, max = 8) {
+  const snap = await getDocs(
+    query(collection(db, "activity", ownerUid, "items"), orderBy("createdAt", "desc"), limit(max))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ownerUid, ...d.data() }));
 }

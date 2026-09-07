@@ -42,6 +42,25 @@ service cloud.firestore {
       allow delete: if signedIn() && request.auth.uid in resource.data.uids;
     }
 
+    function areFriends(a, b) {
+      return exists(/databases/$(database)/documents/friendships/$(a + '_' + b))
+          || exists(/databases/$(database)/documents/friendships/$(b + '_' + a));
+    }
+    function feedIsPublic(ownerUid) {
+      return exists(/databases/$(database)/documents/playerCards/$(ownerUid))
+        && get(/databases/$(database)/documents/playerCards/$(ownerUid))
+             .data.get('feedVisibility', 'private') == 'public';
+    }
+
+    // ---- activity feed: each user's recent matches / results ----
+    match /activity/{ownerUid}/items/{itemId} {
+      allow read: if signedIn() && (
+        ownerUid == request.auth.uid
+        || (feedIsPublic(ownerUid) && areFriends(ownerUid, request.auth.uid))
+      );
+      allow create, update, delete: if signedIn() && ownerUid == request.auth.uid;
+    }
+
     // ---- invite-code lookup ----------------------------------------
     // Low-value: maps a short code to a teamId so a new member can find
     // the team before they belong to it.

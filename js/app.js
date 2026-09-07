@@ -207,6 +207,7 @@ const state = {
   friendReqIn: [],
   friendReqOut: [],
   friendCards: {},
+  feed: [],
   loaded: false,
 };
 
@@ -241,9 +242,46 @@ async function refreshFriends() {
     const cardMap = {};
     others.forEach((u, i) => { if (cards[i]) cardMap[u] = cards[i]; });
     Object.assign(state, { friends: fr, friendReqIn: ri, friendReqOut: ro, friendCards: cardMap });
+
+    // build the activity feed from friends who set their feed to public
+    const publicUids = others.filter((u) => cardMap[u]?.feedVisibility === "public");
+    const lists = await Promise.all(
+      publicUids.map((u) => friends.listActivity(u, 8).catch(() => []))
+    );
+    const feed = [];
+    publicUids.forEach((u, i) => {
+      const c = cardMap[u] || {};
+      for (const it of lists[i]) {
+        feed.push({ ...it, actorName: c.bladerName || "Blader", actorPhoto: c.photo || "" });
+      }
+    });
+    feed.sort((a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt));
+    state.feed = feed.slice(0, 25);
   } catch (err) {
     console.error("friends load failed", err);
   }
+}
+
+function tsMillis(ts) {
+  if (!ts) return Date.now();
+  if (typeof ts.toMillis === "function") return ts.toMillis();
+  if (typeof ts.seconds === "number") return ts.seconds * 1000;
+  return 0;
+}
+
+function relTime(ts) {
+  const ms = tsMillis(ts);
+  const diff = Date.now() - ms;
+  if (diff < 60000) return "just now";
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  const wks = Math.floor(days / 7);
+  if (wks < 5) return `${wks}w ago`;
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 async function refreshTeam() {
@@ -302,6 +340,7 @@ async function publishPresence() {
       photo,
       region: state.profile.region || "",
       teamName: state.team ? state.team.name : "",
+      feedVisibility: state.profile.feedVisibility === "public" ? "public" : "private",
       stats,
     });
   } catch (err) {
@@ -558,6 +597,11 @@ function profileForm() {
     { name: "homeStore", label: "Home store / club", placeholder: "Where you usually play" },
     { name: "mainBey", label: "Main Bey", placeholder: "e.g. Dran Sword 3-60F" },
     { name: "bio", label: "Bio / goals", type: "textarea", placeholder: "This season I want to…" },
+    { name: "feedVisibility", label: "Match activity visibility", type: "select",
+      default: p.feedVisibility || "private", options: [
+        { value: "private", label: "Private — only you" },
+        { value: "public", label: "Public — friends see your recent matches" },
+      ] },
   ], p);
 
   bindSubmit(form, async () => {
@@ -569,6 +613,7 @@ function profileForm() {
       mainBey: v.mainBey.trim(),
       bio: v.bio.trim(),
       photo: photo || "",
+      feedVisibility: v.feedVisibility === "public" ? "public" : "private",
     };
     await store.setOne("profile", "main", data);
     if (data.bladerName && auth.currentUser && auth.currentUser.displayName !== data.bladerName) {
@@ -708,6 +753,8 @@ function renderDashboard(main) {
       ${statCard("Decks tracked", decks.length, `${state.beys.length} parts in collection`)}
     </div>
 
+    ${feedPanel()}
+
     ${played.length === 0 ? `<div class="empty">No matches logged yet. Head to <b>Matches</b> to add your first one.</div>` : `
     <div class="panel-row">
       <section class="panel">
@@ -743,6 +790,48 @@ function statCard(label, value, sub) {
   return `<div class="stat-card"><span class="stat-label">${esc(label)}</span>
     <span class="stat-value">${esc(value)}</span>
     <span class="stat-sub">${esc(sub)}</span></div>`;
+}
+
+function feedPanel() {
+  const f = state.feed || [];
+  const vis = state.profile.feedVisibility === "public" ? "public" : "private";
+  return `
+    <section class="panel">
+      <div class="row-between" style="margin-bottom:.7rem">
+        <h2 style="margin:0">Friends activity</h2>
+        <span class="chip${vis === "public" ? " chip--accent" : ""}">Your feed: ${vis}</span>
+      </div>
+      ${f.length === 0
+        ? `<p class="muted small">Nothing here yet. Matches logged by friends who set their activity to <b>Public</b> (Edit profile) show up here.</p>`
+        : `<ul class="feed">${f.map(feedItem).join("")}</ul>`}
+    </section>`;
+}
+
+function feedItem(x) {
+  const badge = x.kind === "match"
+    ? `<span class="result-badge result-badge--${x.result === "W" ? "w" : "l"}">${x.result}</span>`
+    : `<span class="result-badge result-badge--x">${x.placement ? ordinal(x.placement) : "—"}</span>`;
+  return `<li class="feed-item">
+    ${avatarHtml(x.actorName, x.actorPhoto, "avatar--sm")}
+    <div class="feed-body">
+      <div class="feed-text">${feedText(x)}</div>
+      <div class="muted small">${esc(relTime(x.createdAt))}${x.at ? " · " + fmtDate(x.at) : ""}</div>
+    </div>
+    ${badge}
+  </li>`;
+}
+
+function feedText(x) {
+  const who = `<b>${esc(x.actorName || "Blader")}</b>`;
+  if (x.kind === "match") {
+    const verb = x.result === "W" ? "beat" : "lost to";
+    const score = (x.myScore || x.oppScore) ? ` ${x.myScore}–${x.oppScore}` : "";
+    const deck = x.deck ? ` <span class="muted">· ${esc(x.deck)}</span>` : "";
+    return `${who} ${verb} ${esc(x.opponent || "someone")}${score}${deck}`;
+  }
+  const rec = (x.wins != null || x.losses != null)
+    ? ` <span class="muted">· ${Number(x.wins || 0)}–${Number(x.losses || 0)}</span>` : "";
+  return `${who} placed ${esc(ordinal(x.placement || 0))} at ${esc(x.name || "a tournament")}${rec}`;
 }
 
 function finishBars(counts, total) {
@@ -1792,6 +1881,7 @@ async function save(coll, existing, data) {
   try {
     if (existing) await store.update(coll, existing.id, data);
     else await store.create(coll, data);
+    if (!existing) await postActivity(coll, data);
     await refresh();  // refresh() re-publishes the player card + team stats
     modal.close();
     render();
@@ -1799,6 +1889,36 @@ async function save(coll, existing, data) {
   } catch (err) {
     console.error(err);
     toast(err.message || "Could not save.", "err");
+  }
+}
+
+/** Add a feed item when a new match / placed tournament is logged. Best-effort. */
+async function postActivity(coll, data) {
+  try {
+    if (coll === "matches") {
+      const res = matchResult(data);
+      if (res !== "W" && res !== "L") return;
+      const { mine, opp } = matchScore(data);
+      await friends.addActivity({
+        kind: "match",
+        result: res,
+        opponent: data.opponent || "",
+        myScore: mine, oppScore: opp,
+        deck: data.myDeck || "",
+        at: data.date || today(),
+      });
+    } else if (coll === "tournaments" && Number(data.placement) > 0) {
+      await friends.addActivity({
+        kind: "tournament",
+        name: data.name || "",
+        placement: Number(data.placement),
+        wins: data.wins == null ? null : Number(data.wins),
+        losses: data.losses == null ? null : Number(data.losses),
+        at: data.date || today(),
+      });
+    }
+  } catch (err) {
+    console.error("activity post failed", err);
   }
 }
 
