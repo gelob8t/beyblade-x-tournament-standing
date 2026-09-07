@@ -10,6 +10,7 @@ import {
 } from "./firebase.js";
 import * as store from "./store.js";
 import * as teams from "./teams.js";
+import * as friends from "./friends.js";
 
 // ---------------------------------------------------------------------------
 // Tiny helpers
@@ -202,6 +203,10 @@ const state = {
   teamBattles: [],
   teamEvents: [],
   teamTab: "roster",
+  friends: [],
+  friendReqIn: [],
+  friendReqOut: [],
+  friendCards: {},
   loaded: false,
 };
 
@@ -214,7 +219,31 @@ async function refresh() {
     store.getOne("profile", "main"),
   ]);
   Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, loaded: true });
-  await refreshTeam();
+  await Promise.all([refreshTeam(), refreshFriends()]);
+  publishPresence();
+}
+
+async function refreshFriends() {
+  try {
+    const code = await friends.ensureFriendCode(state.profile.friendCode);
+    if (code !== state.profile.friendCode) {
+      await store.setOne("profile", "main", { friendCode: code });
+      state.profile.friendCode = code;
+    }
+    const [fr, ri, ro] = await Promise.all([
+      friends.listFriends(),
+      friends.listIncoming(),
+      friends.listOutgoing(),
+    ]);
+    const me = auth.currentUser.uid;
+    const others = fr.map((f) => (f.uids || []).find((u) => u !== me)).filter(Boolean);
+    const cards = await Promise.all(others.map((u) => friends.getCard(u).catch(() => null)));
+    const cardMap = {};
+    others.forEach((u, i) => { if (cards[i]) cardMap[u] = cards[i]; });
+    Object.assign(state, { friends: fr, friendReqIn: ri, friendReqOut: ro, friendCards: cardMap });
+  } catch (err) {
+    console.error("friends load failed", err);
+  }
 }
 
 async function refreshTeam() {
@@ -262,14 +291,32 @@ function myStats() {
   };
 }
 
-async function publishMyStats() {
-  if (!state.team) return;
+/** Push the current user's record to their public player card and, if on a
+ *  team, to their team roster row. Best-effort — never throws. */
+async function publishPresence() {
+  const stats = myStats();
+  const photo = state.profile.photo || "";
   try {
-    await teams.publishStats(state.team.id, displayName(), myStats(), state.profile.photo || "");
+    await friends.publishCard({
+      bladerName: displayName(),
+      photo,
+      region: state.profile.region || "",
+      teamName: state.team ? state.team.name : "",
+      stats,
+    });
   } catch (err) {
-    console.error("stat publish failed", err);
+    console.error("card publish failed", err);
+  }
+  if (state.team) {
+    try {
+      await teams.publishStats(state.team.id, displayName(), stats, photo);
+    } catch (err) {
+      console.error("stat publish failed", err);
+    }
   }
 }
+// legacy name kept for existing call sites
+const publishMyStats = publishPresence;
 
 function initials(name) {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
@@ -529,7 +576,7 @@ function profileForm() {
     }
     state.profile = { ...state.profile, ...data };
     syncProfileChrome();
-    if (state.team) await publishMyStats();
+    await publishPresence();
     modal.close();
     render();
     toast("Profile updated.");
@@ -575,6 +622,7 @@ function render() {
     collection: renderCollection,
     decks: renderDecks,
     team: renderTeam,
+    friends: renderFriends,
   }[state.view] || renderDashboard)(main);
 }
 
@@ -1536,7 +1584,8 @@ function renderTeamJoin(main) {
     const teamId = await teams.joinTeam(code, displayName());
     await store.setOne("profile", "main", { teamId });
     state.profile.teamId = teamId;
-    await publishMyStats();
+    await refreshTeam();
+    await publishPresence();
     await refreshTeam();
     state.teamTab = "roster";
     renderTeam(main);
@@ -1567,9 +1616,10 @@ function teamForm(existing) {
         const teamId = await teams.createTeam(data, displayName());
         await store.setOne("profile", "main", { teamId });
         state.profile.teamId = teamId;
-        await publishMyStats();
         state.teamTab = "roster";
       }
+      await refreshTeam();
+      await publishPresence();
       await refreshTeam();
       modal.close();
       renderTeam($("#main"));
@@ -1597,14 +1647,152 @@ function confirmTeamAction(title, message, run) {
 }
 
 // ---------------------------------------------------------------------------
+// Friends
+// ---------------------------------------------------------------------------
+function friendRate(s) {
+  const w = Number(s?.matchW || 0), l = Number(s?.matchL || 0);
+  return w + l ? w / (w + l) : 0;
+}
+
+function renderFriends(main) {
+  const me = auth.currentUser.uid;
+  const code = state.profile.friendCode || "…";
+  const incoming = state.friendReqIn;
+  const outgoing = state.friendReqOut;
+
+  const friendRows = state.friends
+    .map((f) => {
+      const otherUid = (f.uids || []).find((u) => u !== me);
+      return { otherUid, card: state.friendCards[otherUid] || null };
+    })
+    .filter((r) => r.otherUid)
+    .sort((a, b) => friendRate(b.card?.stats) - friendRate(a.card?.stats));
+
+  main.innerHTML = `
+    <div class="view-head"><h1>Friends</h1></div>
+
+    <div class="panel-row">
+      <section class="panel">
+        <h2>Your friend code</h2>
+        <p class="muted small">Share this so other bladers can add you.</p>
+        <button class="btn btn-ghost friend-code" id="copy-friend-code">${esc(code)}</button>
+      </section>
+      <section class="panel">
+        <h2>Add a friend</h2>
+        <form id="add-friend-form" class="entry-form">
+          <label class="field"><span>Friend code</span><input id="friend-code-input" maxlength="6" placeholder="ABC123" style="text-transform:uppercase" required /></label>
+          <div class="form-actions"><button class="btn btn-primary">Send request</button></div>
+        </form>
+      </section>
+    </div>
+
+    ${incoming.length ? `<section class="panel">
+      <h2>Requests <span class="muted">(${incoming.length})</span></h2>
+      <div class="req-list">
+        ${incoming.map((r) => `<div class="req-row">
+          ${avatarHtml(r.fromName, r.fromPhoto, "avatar--sm")}
+          <span class="req-name">${esc(r.fromName || "Blader")}</span>
+          <span class="req-actions">
+            <button class="btn btn-primary btn-sm" data-accept="${r.id}">Accept</button>
+            <button class="btn btn-ghost btn-sm" data-decline="${r.id}">Decline</button>
+          </span>
+        </div>`).join("")}
+      </div>
+    </section>` : ""}
+
+    <section class="panel">
+      <h2>Friends <span class="muted">(${friendRows.length})</span></h2>
+      ${friendRows.length === 0 ? `<p class="muted">No friends yet. Share your code or add someone above.</p>` : `
+      <div class="friend-grid">
+        ${friendRows.map((r) => {
+          const c = r.card || {};
+          const s = c.stats || {};
+          const w = Number(s.matchW || 0), l = Number(s.matchL || 0);
+          const rate = Math.round(friendRate(s) * 100);
+          return `<article class="friend-card">
+            ${avatarHtml(c.bladerName, c.photo, "avatar--lg")}
+            <div class="friend-main">
+              <div class="friend-name">${esc(c.bladerName || "Blader")}</div>
+              <div class="muted small">${esc([c.region, c.teamName].filter(Boolean).join(" · ") || "—")}</div>
+              <div class="friend-rec"><span>${w}–${l}</span>
+                <div class="mini-bar"><span style="width:${rate}%"></span></div><span>${rate}%</span></div>
+            </div>
+            <button class="btn-link danger" data-unfriend="${r.otherUid}">remove</button>
+          </article>`;
+        }).join("")}
+      </div>`}
+    </section>
+
+    ${outgoing.length ? `<section class="panel">
+      <h2>Pending sent <span class="muted">(${outgoing.length})</span></h2>
+      <div class="req-list">
+        ${outgoing.map((r) => `<div class="req-row">
+          <span class="req-name muted">Waiting for them to accept…</span>
+          <span class="req-actions"><button class="btn btn-ghost btn-sm" data-cancel="${r.id}">Cancel</button></span>
+        </div>`).join("")}
+      </div>
+    </section>` : ""}
+  `;
+
+  $("#copy-friend-code").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(code); toast("Friend code copied."); }
+    catch { toast(code, "warn"); }
+  });
+
+  bindSubmit($("#add-friend-form"), async () => {
+    const val = $("#friend-code-input").value;
+    await friends.sendRequest(val, { name: displayName(), photo: state.profile.photo || "" });
+    await refreshFriends();
+    renderFriends(main);
+    toast("Friend request sent.");
+  });
+
+  $$("[data-accept]", main).forEach((b) =>
+    b.addEventListener("click", (e) => runBtn(e.currentTarget, "…", async () => {
+      const req = incoming.find((r) => r.id === b.dataset.accept);
+      await friends.acceptRequest(req);
+      await refreshFriends();
+      renderFriends(main);
+      toast("You're now friends!");
+    }))
+  );
+  $$("[data-decline]", main).forEach((b) =>
+    b.addEventListener("click", (e) => runBtn(e.currentTarget, "…", async () => {
+      await friends.dropRequest(b.dataset.decline);
+      await refreshFriends();
+      renderFriends(main);
+      toast("Request declined.");
+    }))
+  );
+  $$("[data-cancel]", main).forEach((b) =>
+    b.addEventListener("click", (e) => runBtn(e.currentTarget, "…", async () => {
+      await friends.dropRequest(b.dataset.cancel);
+      await refreshFriends();
+      renderFriends(main);
+      toast("Request cancelled.");
+    }))
+  );
+  $$("[data-unfriend]", main).forEach((b) =>
+    b.addEventListener("click", () => confirmTeamAction(
+      "Remove friend", "Remove this blader from your friends?",
+      async () => {
+        await friends.removeFriend(b.dataset.unfriend);
+        await refreshFriends();
+        renderFriends(main);
+        toast("Friend removed.");
+      }
+    ))
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Shared save / delete
 // ---------------------------------------------------------------------------
 async function save(coll, existing, data) {
   try {
     if (existing) await store.update(coll, existing.id, data);
     else await store.create(coll, data);
-    await refresh();
-    if (coll === "matches" || coll === "tournaments") await publishMyStats();
+    await refresh();  // refresh() re-publishes the player card + team stats
     modal.close();
     render();
     toast("Saved.");

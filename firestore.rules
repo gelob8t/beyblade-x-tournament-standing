@@ -13,6 +13,35 @@ service cloud.firestore {
       allow read, write: if signedIn() && request.auth.uid == userId;
     }
 
+    // ---- friends -------------------------------------------------
+    // Public card: name, photo, region, team, aggregate record. Any
+    // signed-in user can read one; you only write your own.
+    match /playerCards/{cardUid} {
+      allow read: if signedIn();
+      allow write: if signedIn() && cardUid == request.auth.uid;
+    }
+    match /friendCodes/{code} {
+      allow read, create, delete: if signedIn();
+      allow update: if false;
+    }
+    match /friendRequests/{reqId} {
+      allow read: if signedIn()
+        && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.from == request.auth.uid
+        && request.resource.data.to is string
+        && request.resource.data.to != request.auth.uid;
+      allow delete: if signedIn()
+        && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+    }
+    match /friendships/{pairKey} {
+      allow read: if signedIn() && request.auth.uid in resource.data.uids;
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.uids
+        && request.resource.data.uids.size() == 2;
+      allow delete: if signedIn() && request.auth.uid in resource.data.uids;
+    }
+
     // ---- invite-code lookup ----------------------------------------
     // Low-value: maps a short code to a teamId so a new member can find
     // the team before they belong to it.

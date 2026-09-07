@@ -16,6 +16,7 @@ match results, your parts collection, decks, and a stats dashboard. It's a stati
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON export of all your data |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
+| **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |
 
 Each account's personal journey is private and syncs across any device you sign in on.
 Team data (roster, battles, events) is shared with everyone on that team.
@@ -97,6 +98,7 @@ js/
   firebase.js          Firebase init + re-exports (CDN, no build)
   store.js             Firestore CRUD, scoped to users/{uid}/...
   teams.js             shared team data (teams/... and teamCodes/...)
+  friends.js           friend codes, requests, friendships, player cards
   app.js               auth flow, views, forms, stats
 firestore.rules        security rules to paste into Firebase
 ```
@@ -125,6 +127,12 @@ teams/{teamId}/battles/{id}  { date, opponentTeam, format, event,
                                teamResult, notes }
 teams/{teamId}/events/{id}   { name, date, location, format, placement, wins, losses,
                                roster, notes }
+
+playerCards/{uid}            { bladerName, photo, region, teamName,
+                               stats: { matchW, matchL, gameW, gameL, ... } }
+friendCodes/{CODE}           { uid }                    // add-by-code lookup
+friendRequests/{id}          { from, to, fromName, fromPhoto }   // exists = pending
+friendships/{a_b}            { uids: [a, b] }           // doc id = sorted uids
 ```
 
 Members publish their aggregate record to `teams/{teamId}/members/{uid}.stats` whenever
