@@ -83,8 +83,16 @@ export async function sendRequest(rawCode, me) {
   const target = cs.data().uid;
   if (target === uid()) throw new Error("That's your own friend code.");
 
-  const fs = await getDoc(doc(db, "friendships", pairKey(uid(), target)));
-  if (fs.exists()) throw new Error("You're already friends.");
+  // A friendship doc you're NOT part of is unreadable (rules), which shows up
+  // as a permission error — that just means you're not friends yet, so ignore it.
+  let alreadyFriends = false;
+  try {
+    const fs = await getDoc(doc(db, "friendships", pairKey(uid(), target)));
+    alreadyFriends = fs.exists();
+  } catch (_) {
+    alreadyFriends = false;
+  }
+  if (alreadyFriends) throw new Error("You're already friends.");
 
   const [out, inc] = await Promise.all([listOutgoing(), listIncoming()]);
   if (out.some((r) => r.to === target)) throw new Error("You already sent them a request.");
@@ -100,11 +108,15 @@ export async function sendRequest(rawCode, me) {
 }
 
 export async function acceptRequest(req) {
-  await setDoc(doc(db, "friendships", pairKey(req.from, req.to)), {
-    uids: [req.from, req.to].sort(),
-    createdAt: serverTimestamp(),
-  });
-  await deleteDoc(doc(db, "friendRequests", req.id));
+  const ref = doc(db, "friendships", pairKey(req.from, req.to));
+  try {
+    await setDoc(ref, { uids: [req.from, req.to].sort(), createdAt: serverTimestamp() });
+  } catch (err) {
+    // maybe the other side created it first — fine if it now exists with us in it
+    const fs = await getDoc(ref).catch(() => null);
+    if (!fs || !fs.exists()) throw err;
+  }
+  await deleteDoc(doc(db, "friendRequests", req.id)).catch(() => {});
 }
 
 export async function dropRequest(reqId) {
