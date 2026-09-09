@@ -64,6 +64,23 @@ The **Meta** tab's combo tiers are re-derived from community votes every Monday 
 Without the secret the workflow just logs a skip message; the live community
 ratings on the Meta tab still work either way.
 
+### 2c. (Optional) Part images
+
+The **Collection → Browse catalog** picker shows a generated icon per part. To
+show real photos instead:
+
+1. Run `npm run parts:slugs` to list every part and its expected file name
+   (e.g. `Dran Sword → dran-sword.png`).
+2. Put the images somewhere web-accessible — a folder in this repo like
+   `assets/parts/`, or an external CDN/bucket URL.
+3. In [`data/parts.json`](data/parts.json) set `"imageBase"` to that folder
+   (e.g. `"./assets/parts/"`) and `"imageExt"` if it isn't `.png`.
+
+The app builds each URL as `imageBase + slug + imageExt`. For a one-off, put an
+explicit `"image": "https://…"` on a single part instead (that wins). Any URL
+that fails to load falls back to the generated icon automatically. Only use
+images you have the right to host.
+
 ### 3. Add your config to the app
 
 Edit [`js/firebase-config.js`](js/firebase-config.js) and replace every `REPLACE_ME`
@@ -130,8 +147,9 @@ js/
   teams.js             shared team data (teams/... and teamCodes/...)
   friends.js           friend codes, requests, friendships, cards, activity feed
   meta.js              community combo ratings (metaCombos/...)
-  catalog.js           parts catalog loader + filter (data/parts.json)
+  catalog.js           parts catalog loader + filter + slugify (data/parts.json)
   app.js               auth flow, views, forms, wiring
+scripts/part-slugs.mjs  `npm run parts:slugs` — list part image file names
 data/meta.json         curated tier-list snapshot (edit or PR to update)
 data/parts.json        parts catalog for the collection picker (community-maintained; PRs welcome)
 firestore.rules        security rules (auto-deployed if FIREBASE_TOKEN is set)

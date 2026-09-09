@@ -1,7 +1,7 @@
 // Run: node --test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesPartQuery, queryCatalog, roleColor } from "../js/catalog.js";
+import { matchesPartQuery, queryCatalog, roleColor, slugify } from "../js/catalog.js";
 
 const PARTS = [
   { type: "Blade", name: "Dran Sword", system: "BX", role: "Attack", spin: "Right", note: "original attacker" },
@@ -43,4 +43,12 @@ test("roleColor: known role, unknown role, custom map", () => {
   assert.equal(roleColor("Attack"), "#ff6a3d");
   assert.equal(roleColor("Nonsense"), "#8aa0bf");
   assert.equal(roleColor("Attack", { roleColors: { Attack: "#000000" } }), "#000000");
+});
+
+test("slugify: file-name-safe part slugs", () => {
+  assert.equal(slugify("Dran Sword"), "dran-sword");
+  assert.equal(slugify("3-60"), "3-60");
+  assert.equal(slugify("M (Metal) variants"), "m-metal-variants");
+  assert.equal(slugify("  Under  Flat  "), "under-flat");
+  assert.equal(slugify(""), "");
 });

@@ -12,24 +12,45 @@ const ROLE_COLORS = {
 
 let cache = null;
 
+/**
+ * File-name-safe slug for a part name — used to derive an image URL from
+ * `imageBase` when a part has no explicit `image`.
+ *   "Dran Sword" -> "dran-sword"   "3-60" -> "3-60"
+ *   "M (Metal) variants" -> "m-metal-variants"
+ */
+export function slugify(name) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 /** Load and normalise data/parts.json.  Returns a flat `parts` array too. */
 export async function loadCatalog() {
   if (cache) return cache;
   const res = await fetch("./data/parts.json", { cache: "no-cache" });
   if (!res.ok) throw new Error("Couldn't load the parts catalog.");
   const raw = await res.json();
+  const base = raw.imageBase || "";
+  const ext = raw.imageExt || ".png";
   const tag = (list, type) =>
-    (Array.isArray(list) ? list : []).map((p) => ({
-      type,
-      name: String(p.name || "").trim(),
-      system: p.system || "",
-      role: p.role || "",
-      spin: p.spin || "",
-      height: p.height ?? null,
-      peaks: p.peaks ?? null,
-      note: p.note || "",
-      image: p.image || "",
-    })).filter((p) => p.name);
+    (Array.isArray(list) ? list : []).map((p) => {
+      const name = String(p.name || "").trim();
+      const slug = slugify(name);
+      return {
+        type,
+        name,
+        slug,
+        system: p.system || "",
+        role: p.role || "",
+        spin: p.spin || "",
+        height: p.height ?? null,
+        peaks: p.peaks ?? null,
+        note: p.note || "",
+        // explicit URL wins; otherwise derive one from imageBase + slug
+        image: p.image || (base && slug ? base + slug + ext : ""),
+      };
+    }).filter((p) => p.name);
   const parts = [
     ...tag(raw.blades, "Blade"),
     ...tag(raw.ratchets, "Ratchet"),

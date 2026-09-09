@@ -2,10 +2,12 @@
   "name": "beyblade-x-tournament-standing",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Static PWA for tracking a Beyblade X tournament journey. No build step — Firebase loads from CDN.",
   "scripts": {
     "start": "python -m http.server 8000",
     "test": "node --test",
+    "parts:slugs": "node scripts/part-slugs.mjs",
     "rules:deploy": "firebase deploy --only firestore:rules"
   }
 }

@@ -1,6 +1,9 @@
 {
   "updated": "2026-09-09",
-  "note": "Starter catalog of Beyblade X parts for the collection picker. Community-maintained — send a PR to add a part or fix a detail (js/../data/parts.json). `system` (BX/UX/CX), `role` and `spin` are best-effort. Icons are generated; add an \"image\" URL to any entry to show a real photo instead. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "note": "Starter catalog of Beyblade X parts for the collection picker. Community-maintained — send a PR to add a part or fix a detail. `system` (BX/UX/CX), `role` and `spin` are best-effort. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.png. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
+  "imageBase": "",
+  "imageExt": ".png",
   "roleColors": {
     "Attack": "#ff6a3d",
     "Stamina": "#37c6e8",

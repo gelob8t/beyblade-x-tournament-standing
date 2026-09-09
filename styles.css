@@ -563,13 +563,23 @@ textarea { resize: vertical; }
 /* ---------- collection ---------- */
 .collection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.2rem; }
 .part-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
-.part-list li { display: flex; justify-content: space-between; gap: .6rem; align-items: baseline; padding-bottom: .5rem; border-bottom: 1px solid var(--bg-2); font-size: .9rem; }
+.part-list li { display: flex; justify-content: space-between; gap: .6rem; align-items: center; padding-bottom: .5rem; border-bottom: 1px solid var(--bg-2); font-size: .9rem; }
+.part-row-main { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.part-row-main > span { min-width: 0; }
 .row-actions { display: flex; gap: .6rem; flex: none; }
 .combo-list { margin: .3rem 0 0; padding-left: 1.2rem; font-size: .9rem; }
 .combo-list li { margin: .1rem 0; }
 
 /* ---------- parts catalog picker ---------- */
 .part-icon { display: block; flex: none; }
+.part-vis { position: relative; display: inline-block; flex: none; }
+.part-vis-svg { position: absolute; inset: 0; }
+.part-vis-svg svg { width: 100%; height: 100%; display: block; }
+.part-vis-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; background: var(--bg-2); border-radius: 3px;
+  transition: opacity .2s ease;
+}
 .catalog-picker { display: grid; gap: .9rem; }
 .catalog-controls { display: grid; gap: .55rem; position: sticky; top: 0; background: var(--panel); padding-bottom: .35rem; z-index: 1; }
 .catalog-controls input[type="search"] { width: 100%; }

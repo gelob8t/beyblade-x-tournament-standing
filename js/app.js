@@ -255,15 +255,17 @@ async function loadMetaParts() {
 }
 
 async function refresh() {
-  const [tournaments, matches, beys, decks, profile, metaParts] = await Promise.all([
+  const [tournaments, matches, beys, decks, profile, metaParts, cat] = await Promise.all([
     store.list("tournaments"),
     store.list("matches"),
     store.list("beys"),
     store.list("decks"),
     store.getOne("profile", "main"),
     loadMetaParts(),
+    catalog.loadCatalog().catch(() => null),
   ]);
   Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, metaParts, loaded: true });
+  if (cat) state.catalog = cat;
   await Promise.all([refreshTeam(), refreshFriends()]);
   computeAchievements();
   publishPresence();
@@ -1713,6 +1715,13 @@ function liveScoring(template) {
 // ---------------------------------------------------------------------------
 const PART_TYPES = ["Blade", "Ratchet", "Bit"];
 
+/** Find a loaded-catalog entry for an owned part, by type + name (case-insensitive). */
+function catalogPart(type, name) {
+  const n = String(name || "").trim().toLowerCase();
+  const all = (state.catalog && state.catalog.parts) || [];
+  return all.find((p) => p.type === type && p.name.toLowerCase() === n) || null;
+}
+
 function renderCollection(main) {
   main.innerHTML = `
     <div class="view-head">
@@ -1731,7 +1740,10 @@ function renderCollection(main) {
           <h2>${type}s <span class="muted">(${items.length})</span></h2>
           ${items.length ? `<ul class="part-list">
             ${items.map((b) => `<li>
-              <div><b>${esc(b.name)}</b>${b.notes ? `<span class="muted"> — ${esc(b.notes)}</span>` : ""}</div>
+              <div class="part-row-main">
+                ${partIcon(catalogPart(type, b.name) || { type, name: b.name }, 26)}
+                <span><b>${esc(b.name)}</b>${b.notes ? `<span class="muted"> — ${esc(b.notes)}</span>` : ""}</span>
+              </div>
               <span class="row-actions">
                 <button class="btn-link" data-edit="${b.id}">edit</button>
                 <button class="btn-link danger" data-del="${b.id}">delete</button>
@@ -1818,15 +1830,27 @@ function bulkBeyForm() {
   modal.open("Bulk add parts", form);
 }
 
-// A generated icon for a catalog part: shape by type, tint by role.
-// Falls back to a real photo if the catalog entry carries an `image` URL.
+// A part's visual: a real photo if the catalog entry has an `image` URL
+// (with the generated icon as a fallback if it fails to load), otherwise
+// just the generated icon — shape by type, tint by role.
 function partIcon(part, size = 40) {
-  if (part.image) {
-    return `<img class="part-icon" src="${esc(part.image)}" alt="" width="${size}" height="${size}" loading="lazy" />`;
+  const svg = partSvg(part, size);
+  if (part && part.image) {
+    // icon underneath, photo on top; if the photo 404s it removes itself
+    return `<span class="part-vis" style="width:${size}px;height:${size}px">` +
+      `<span class="part-vis-svg">${svg}</span>` +
+      `<img class="part-vis-img" src="${esc(part.image)}" alt="" loading="lazy" ` +
+      `style="opacity:0" onload="this.style.opacity=1" onerror="this.remove()" />` +
+      `</span>`;
   }
-  const col = catalog.roleColor(part.role, state.catalog);
+  return svg;
+}
+
+function partSvg(part, size = 40) {
+  const col = catalog.roleColor(part && part.role, state.catalog);
   const stroke = "rgba(255,255,255,.22)";
   let inner = "";
+  part = part || {};
   if (part.type === "Blade") {
     const cx = 20, cy = 20, R = 15, r = 9, n = 6, pts = [];
     for (let i = 0; i < n * 2; i++) {
