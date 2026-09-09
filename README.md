@@ -11,10 +11,10 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | --- | --- |
 | **Tournaments** | Name, date, location, format, final placement, W–L, notes |
 | **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes |
-| **Collection** | Owned Blades, Ratchets and Bits |
+| **Collection** | Owned Blades, Ratchets and Bits — name fields autocomplete from the canonical Beyblade X parts list |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
-| **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON export of all your data |
+| **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON **export** of all your data, and **import / restore** from that file (adds only what's not already there) |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 | **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |
 | **Friends activity** | Dashboard feed of friends' recent matches / placements — shown only for friends who set their activity to **Public** (Edit profile → Match activity visibility; default Private) |

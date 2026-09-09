@@ -70,6 +70,28 @@ export async function createMany(name, rows) {
   return rows.length;
 }
 
+/**
+ * Import rows that carry their own `id` (from an export file), in batches.
+ * Keeps the row's `createdAt` if it's a Date/Timestamp, else stamps a new one.
+ * Rows without an `id` get a fresh one.
+ */
+export async function createManyAt(name, rows) {
+  const CHUNK = 400;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    for (const { id, updatedAt, ...data } of rows.slice(i, i + CHUNK)) {
+      const ref = id ? doc(db, "users", uid(), name, id) : doc(col(name));
+      batch.set(ref, {
+        ...data,
+        createdAt: data.createdAt || serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+  return rows.length;
+}
+
 /** Patch an existing document. */
 export async function update(name, id, data) {
   await updateDoc(doc(db, "users", uid(), name, id), {

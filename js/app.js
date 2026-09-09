@@ -222,6 +222,7 @@ const state = {
   openFriend: null,
   friendProfile: null,
   achv: [],
+  metaParts: { Blade: [], Ratchet: [], Bit: [] },
   meta: null,
   metaTab: "combos",
   metaSort: "community",
@@ -229,15 +230,29 @@ const state = {
   loaded: false,
 };
 
+async function loadMetaParts() {
+  try {
+    const c = await meta.loadCurated();
+    return {
+      Blade: (c.blades || []).map((b) => b.name).filter(Boolean),
+      Ratchet: (c.ratchets || []).map((r) => r.name).filter(Boolean),
+      Bit: (c.bits || []).map((b) => b.name).filter(Boolean),
+    };
+  } catch {
+    return state.metaParts || { Blade: [], Ratchet: [], Bit: [] };
+  }
+}
+
 async function refresh() {
-  const [tournaments, matches, beys, decks, profile] = await Promise.all([
+  const [tournaments, matches, beys, decks, profile, metaParts] = await Promise.all([
     store.list("tournaments"),
     store.list("matches"),
     store.list("beys"),
     store.list("decks"),
     store.getOne("profile", "main"),
+    loadMetaParts(),
   ]);
-  Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, loaded: true });
+  Object.assign(state, { tournaments, matches, beys, decks, profile: profile || {}, metaParts, loaded: true });
   await Promise.all([refreshTeam(), refreshFriends()]);
   computeAchievements();
   publishPresence();
@@ -654,6 +669,7 @@ function initProfileMenu() {
     setOpen(false);
     if (act === "edit") profileForm();
     else if (act === "export") exportData();
+    else if (act === "import") importData();
     else if (act === "signout") signOut(auth);
     else if (act === "reset") {
       const email = auth.currentUser?.email;
@@ -760,6 +776,108 @@ function exportData() {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
   toast("Export downloaded.");
+}
+
+function importData() {
+  const COLLS = ["tournaments", "matches", "beys", "decks"];
+  const NOUN = { tournaments: "tournament", matches: "match", beys: "part", decks: "deck" };
+
+  const reviveDate = (v) => {
+    if (!v) return null;
+    if (typeof v === "string") { const d = new Date(v); return isNaN(+d) ? null : d; }
+    if (v && typeof v === "object") {
+      const s = typeof v.seconds === "number" ? v.seconds
+        : typeof v._seconds === "number" ? v._seconds : null;
+      if (s != null) return new Date(s * 1000);
+    }
+    return null;
+  };
+
+  const box = document.createElement("div");
+  box.className = "import-box";
+  box.innerHTML = `
+    <p class="muted">Restore from a file you saved with <b>Export my data</b>. Your current entries stay put — only items that aren't already in your account get added.</p>
+    <label class="field">
+      <span>Backup file (.json)</span>
+      <input type="file" accept="application/json,.json" id="import-file" />
+    </label>
+    <div id="import-summary"></div>`;
+  const summary = box.querySelector("#import-summary");
+
+  box.querySelector("#import-file").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    summary.innerHTML = "";
+    if (!file) return;
+
+    let payload;
+    try {
+      payload = JSON.parse(await file.text());
+    } catch {
+      summary.innerHTML = `<p class="form-error">That file isn't valid JSON.</p>`;
+      return;
+    }
+    const hasColls = payload && typeof payload === "object" && COLLS.some((c) => Array.isArray(payload[c]));
+    const hasProfile = payload && typeof payload === "object" && payload.profile
+      && typeof payload.profile === "object" && Object.keys(payload.profile).length > 0;
+    if (!hasColls && !hasProfile) {
+      summary.innerHTML = `<p class="form-error">This doesn't look like a Beyblade X Journey export.</p>`;
+      return;
+    }
+
+    const plan = {};
+    let total = 0;
+    for (const c of COLLS) {
+      const rows = Array.isArray(payload[c]) ? payload[c].filter((r) => r && typeof r === "object") : [];
+      const have = new Set((state[c] || []).map((x) => x.id));
+      plan[c] = rows.filter((r) => !r.id || !have.has(r.id));
+      total += plan[c].length;
+    }
+    const fromEmail = payload.account && payload.account.email;
+    const otherAccount = fromEmail && fromEmail !== (auth.currentUser && auth.currentUser.email);
+
+    if (!total && !hasProfile) {
+      summary.innerHTML = `<p class="muted">Everything in this file is already in your account — nothing to import.</p>`;
+      return;
+    }
+
+    const lines = COLLS.filter((c) => plan[c].length)
+      .map((c) => `${plan[c].length} ${NOUN[c]}${plan[c].length === 1 ? "" : "s"}`);
+
+    summary.innerHTML = `
+      ${otherAccount ? `<p class="muted">⚠️ This export is from <b>${esc(fromEmail)}</b>, not the account you're signed in as.</p>` : ""}
+      <p><b>Will add:</b> ${lines.length ? lines.join(" · ") : "nothing new"}.</p>
+      ${hasProfile ? `<label class="field field--check"><input type="checkbox" id="import-profile" /> <span>Also overwrite my profile details (name, region, bio, main Bey…)</span></label>` : ""}
+      <button class="btn btn-primary" id="import-go">Import${total ? ` ${total} item${total === 1 ? "" : "s"}` : " profile"}</button>`;
+
+    summary.querySelector("#import-go").addEventListener("click", async (ev) => {
+      if (!navigator.onLine) { toast("You're offline — reconnect to import.", "warn"); return; }
+      await runBtn(ev.currentTarget, "Importing…", async () => {
+        for (const c of COLLS) {
+          if (!plan[c].length) continue;
+          const rows = plan[c].map((r) => {
+            const { updatedAt, createdAt, ...rest } = r;
+            const cd = reviveDate(createdAt);
+            return cd ? { ...rest, createdAt: cd } : rest;
+          });
+          await store.createManyAt(c, rows);
+        }
+        const wantProfile = !!summary.querySelector("#import-profile")?.checked;
+        if (wantProfile && hasProfile) {
+          const { updatedAt, createdAt, friendCode, ...p } = payload.profile;
+          await store.setOne("profile", "main", p);
+        }
+        await refresh();
+        modal.close();
+        render();
+        const msg = total
+          ? `Imported ${total} item${total === 1 ? "" : "s"}${wantProfile ? " + profile" : ""}.`
+          : "Profile imported.";
+        toast(msg);
+      });
+    });
+  });
+
+  modal.open("Import / restore", box);
 }
 
 function switchView(view) {
@@ -1628,6 +1746,16 @@ function beyForm(existing) {
     { name: "name", label: "Name", required: true, placeholder: "Dran Sword / 3-60 / Flat" },
     { name: "notes", label: "Notes", type: "textarea", placeholder: "Condition, source, weight…" },
   ], existing || {});
+
+  // autocomplete the name from the canonical parts list for the chosen type
+  form.append(partDatalists());
+  const nameInput = form.querySelector('[name="name"]');
+  const typeSel = form.querySelector('[name="type"]');
+  const LIST_ID = { Blade: "blades-list", Ratchet: "ratchets-list", Bit: "bits-list" };
+  const syncList = () => nameInput.setAttribute("list", LIST_ID[typeSel.value] || "");
+  syncList();
+  typeSel.addEventListener("change", syncList);
+
   bindSubmit(form, async () => {
     const v = values();
     await save("beys", existing, { type: v.type, name: v.name.trim(), notes: v.notes.trim() });
@@ -1765,14 +1893,23 @@ function deckForm(existing, seedCombo) {
 
 function partDatalists() {
   const frag = document.createDocumentFragment();
+  const mp = state.metaParts || {};
   const make = (id, type) => {
     const dl = document.createElement("datalist");
     dl.id = id;
-    [...new Set(state.beys.filter((b) => b.type === type).map((b) => b.name))].forEach((n) => {
+    // your own collection first, then the canonical meta list — deduped, case-insensitive
+    const mine = state.beys.filter((b) => b.type === type).map((b) => b.name);
+    const seen = new Set();
+    for (const raw of [...mine, ...(mp[type] || [])]) {
+      const n = String(raw || "").trim();
+      if (!n) continue;
+      const k = n.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
       const o = document.createElement("option");
       o.value = n;
       dl.append(o);
-    });
+    }
     frag.append(dl);
   };
   make("blades-list", "Blade");
