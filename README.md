@@ -11,7 +11,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | --- | --- |
 | **Tournaments** | Name, date, location, format, final placement, W–L, notes |
 | **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes |
-| **Collection** | Owned Blades, Ratchets and Bits — name fields autocomplete from the canonical Beyblade X parts list |
+| **Collection** | Owned Blades, Ratchets and Bits. **Browse catalog** opens a searchable, filterable picker (by type / role / system) with a generated icon per part — tick several and add them at once. Name fields also autocomplete from the catalog. |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON **export** of all your data, and **import / restore** from that file (adds only what's not already there) |
@@ -130,8 +130,10 @@ js/
   teams.js             shared team data (teams/... and teamCodes/...)
   friends.js           friend codes, requests, friendships, cards, activity feed
   meta.js              community combo ratings (metaCombos/...)
+  catalog.js           parts catalog loader + filter (data/parts.json)
   app.js               auth flow, views, forms, wiring
 data/meta.json         curated tier-list snapshot (edit or PR to update)
+data/parts.json        parts catalog for the collection picker (community-maintained; PRs welcome)
 firestore.rules        security rules (auto-deployed if FIREBASE_TOKEN is set)
 firebase.json          points firebase-tools at firestore.rules
 test/stats.test.mjs    unit tests, run in CI before every deploy

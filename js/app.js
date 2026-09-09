@@ -14,6 +14,7 @@ import * as store from "./store.js";
 import * as teams from "./teams.js";
 import * as friends from "./friends.js";
 import * as meta from "./meta.js";
+import * as catalog from "./catalog.js";
 import {
   FINISHES, finishLabel, finishPts,
   matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
@@ -223,6 +224,7 @@ const state = {
   friendProfile: null,
   achv: [],
   metaParts: { Blade: [], Ratchet: [], Bit: [] },
+  catalog: null,
   meta: null,
   metaTab: "combos",
   metaSort: "community",
@@ -231,15 +233,24 @@ const state = {
 };
 
 async function loadMetaParts() {
+  const empty = { Blade: [], Ratchet: [], Bit: [] };
   try {
-    const c = await meta.loadCurated();
+    const c = await catalog.loadCatalog();
     return {
-      Blade: (c.blades || []).map((b) => b.name).filter(Boolean),
-      Ratchet: (c.ratchets || []).map((r) => r.name).filter(Boolean),
-      Bit: (c.bits || []).map((b) => b.name).filter(Boolean),
+      Blade: c.blades.map((b) => b.name),
+      Ratchet: c.ratchets.map((r) => r.name),
+      Bit: c.bits.map((b) => b.name),
+    };
+  } catch { /* fall through to the tier list */ }
+  try {
+    const m = await meta.loadCurated();
+    return {
+      Blade: (m.blades || []).map((b) => b.name).filter(Boolean),
+      Ratchet: (m.ratchets || []).map((r) => r.name).filter(Boolean),
+      Bit: (m.bits || []).map((b) => b.name).filter(Boolean),
     };
   } catch {
-    return state.metaParts || { Blade: [], Ratchet: [], Bit: [] };
+    return state.metaParts || empty;
   }
 }
 
@@ -1707,11 +1718,12 @@ function renderCollection(main) {
     <div class="view-head">
       <h1>Collection</h1>
       <div class="head-actions">
+        <button class="btn btn-ghost" id="cat-bey">Browse catalog</button>
         <button class="btn btn-ghost" id="bulk-bey">Bulk add</button>
         <button class="btn btn-primary" id="add-bey">+ Add part</button>
       </div>
     </div>
-    ${state.beys.length === 0 ? `<div class="empty">No parts yet. Add your blades, ratchets and bits.</div>` : `
+    ${state.beys.length === 0 ? `<div class="empty">No parts yet. <button class="btn-link" id="cat-bey-empty" type="button">Browse the catalog</button> or add them manually.</div>` : `
     <div class="collection-grid">
       ${PART_TYPES.map((type) => {
         const items = state.beys.filter((b) => b.type === type);
@@ -1732,6 +1744,8 @@ function renderCollection(main) {
   `;
   $("#add-bey").addEventListener("click", () => beyForm());
   $("#bulk-bey").addEventListener("click", () => bulkBeyForm());
+  $("#cat-bey").addEventListener("click", () => catalogPicker());
+  $("#cat-bey-empty", main)?.addEventListener("click", () => catalogPicker());
   $$("[data-edit]", main).forEach((b) =>
     b.addEventListener("click", () => beyForm(state.beys.find((x) => x.id === b.dataset.edit)))
   );
@@ -1802,6 +1816,160 @@ function bulkBeyForm() {
     toast(`Added ${rows.length} part${rows.length === 1 ? "" : "s"}${skipped ? ` · ${skipped} skipped` : ""}.`);
   });
   modal.open("Bulk add parts", form);
+}
+
+// A generated icon for a catalog part: shape by type, tint by role.
+// Falls back to a real photo if the catalog entry carries an `image` URL.
+function partIcon(part, size = 40) {
+  if (part.image) {
+    return `<img class="part-icon" src="${esc(part.image)}" alt="" width="${size}" height="${size}" loading="lazy" />`;
+  }
+  const col = catalog.roleColor(part.role, state.catalog);
+  const stroke = "rgba(255,255,255,.22)";
+  let inner = "";
+  if (part.type === "Blade") {
+    const cx = 20, cy = 20, R = 15, r = 9, n = 6, pts = [];
+    for (let i = 0; i < n * 2; i++) {
+      const ang = (Math.PI / n) * i - Math.PI / 2;
+      const rad = i % 2 ? r : R;
+      pts.push(`${(cx + rad * Math.cos(ang)).toFixed(1)},${(cy + rad * Math.sin(ang)).toFixed(1)}`);
+    }
+    const spin = part.spin === "Left" ? "↺" : part.spin === "Right" ? "↻" : "";
+    inner = `<polygon points="${pts.join(" ")}" fill="${col}" stroke="${stroke}"/>
+      <circle cx="20" cy="20" r="4.5" fill="#0b0f17"/>
+      ${spin ? `<text x="20" y="24.6" text-anchor="middle" font-size="9" font-weight="700" fill="${col}">${spin}</text>` : ""}`;
+  } else if (part.type === "Ratchet") {
+    const n = Math.max(3, Math.min(12, part.peaks || 6)), ticks = [];
+    for (let i = 0; i < n; i++) {
+      const a = (2 * Math.PI / n) * i;
+      ticks.push(`<line x1="${(20 + 10 * Math.cos(a)).toFixed(1)}" y1="${(20 + 10 * Math.sin(a)).toFixed(1)}" x2="${(20 + 15 * Math.cos(a)).toFixed(1)}" y2="${(20 + 15 * Math.sin(a)).toFixed(1)}" stroke="#8aa0bf" stroke-width="2.3"/>`);
+    }
+    inner = `<circle cx="20" cy="20" r="15" fill="none" stroke="#8aa0bf" stroke-width="1.5"/>
+      <circle cx="20" cy="20" r="9.5" fill="#141b28" stroke="#8aa0bf" stroke-width="1.3"/>
+      ${ticks.join("")}
+      ${part.height ? `<text x="20" y="23.5" text-anchor="middle" font-size="8.5" font-weight="700" fill="#c9d6ea">${part.height}</text>` : ""}`;
+  } else {
+    inner = `<path d="M8 12 H32 L26 24 Q20 34 14 24 Z" fill="${col}" stroke="${stroke}"/>
+      <circle cx="20" cy="26.5" r="3.1" fill="#0b0f17"/>`;
+  }
+  return `<svg class="part-icon" viewBox="0 0 40 40" width="${size}" height="${size}" aria-hidden="true">${inner}</svg>`;
+}
+
+// Browse the Beyblade X parts catalog and add several to your collection at once.
+async function catalogPicker() {
+  const box = document.createElement("div");
+  box.className = "catalog-picker";
+  box.innerHTML = `<p class="muted">Loading catalog…</p>`;
+  modal.open("Parts catalog", box);
+
+  let cat;
+  try {
+    cat = await catalog.loadCatalog();
+    state.catalog = cat;
+  } catch {
+    box.innerHTML = `<p class="form-error">Couldn't load the catalog.</p>
+      <button class="btn btn-ghost" id="cat-manual">Add a part manually</button>`;
+    box.querySelector("#cat-manual").addEventListener("click", () => beyForm());
+    return;
+  }
+
+  const key = (p) => (p.type + "|" + p.name).toLowerCase();
+  const owned = new Set(state.beys.map((b) => (b.type + "|" + (b.name || "")).toLowerCase()));
+  const picked = new Set();
+  const f = { q: "", type: "", role: "", system: "" };
+
+  box.innerHTML = `
+    <div class="catalog-controls">
+      <input type="search" id="cat-q" placeholder="Search parts…" autocomplete="off" />
+      <div class="catalog-chips" id="cat-type"></div>
+      <div class="catalog-chips" id="cat-role"></div>
+      <div class="catalog-chips" id="cat-system"></div>
+    </div>
+    <div class="catalog-results" id="cat-results"></div>
+    <div class="catalog-foot">
+      <span class="muted small" id="cat-count"></span>
+      <button class="btn btn-primary" id="cat-add" disabled>Add selected</button>
+    </div>
+    <p class="muted small">Missing a part? <a href="https://github.com/gelob8t/beyblade-x-tournament-standing/edit/main/data/parts.json" target="_blank" rel="noopener">Add it on GitHub</a> or <button class="btn-link" id="cat-manual" type="button">type it in</button>.</p>`;
+
+  const chip = (label, val, k) => `<button type="button" class="chip-btn" data-key="${k}" data-val="${esc(val)}">${esc(label)}</button>`;
+  box.querySelector("#cat-type").innerHTML =
+    [chip("All", "", "type"), ...["Blade", "Ratchet", "Bit"].map((t) => chip(t + "s", t, "type"))].join("");
+  box.querySelector("#cat-role").innerHTML =
+    [chip("Any role", "", "role"), ...["Attack", "Stamina", "Defense", "Balance"].map((r) => chip(r, r, "role"))].join("");
+  box.querySelector("#cat-system").innerHTML =
+    [chip("Any system", "", "system"), ...["BX", "UX", "CX"].map((s) => chip(s, s, "system"))].join("");
+
+  const results = box.querySelector("#cat-results");
+  const countEl = box.querySelector("#cat-count");
+  const addBtn = box.querySelector("#cat-add");
+  const roleRow = box.querySelector("#cat-role");
+  const sysRow = box.querySelector("#cat-system");
+
+  const draw = () => {
+    roleRow.hidden = f.type === "Ratchet";
+    sysRow.hidden = !(f.type === "" || f.type === "Blade");
+    if (roleRow.hidden) f.role = "";
+    if (sysRow.hidden) f.system = "";
+    for (const row of [box.querySelector("#cat-type"), roleRow, sysRow]) {
+      row.querySelectorAll(".chip-btn").forEach((c) =>
+        c.classList.toggle("is-active", f[c.dataset.key] === c.dataset.val));
+    }
+
+    const list = catalog.queryCatalog(cat.parts, f);
+    results.innerHTML = list.length ? list.map((p) => {
+      const k = key(p);
+      const have = owned.has(k);
+      const sel = picked.has(k);
+      const metaLine = [p.system, p.role, p.spin && p.spin + "-spin", p.height && p.height + "mm"]
+        .filter(Boolean).join(" · ");
+      return `<button type="button" class="catalog-card${sel ? " is-picked" : ""}${have ? " is-owned" : ""}" data-k="${esc(k)}"${have ? " disabled" : ""}>
+        ${partIcon(p, 38)}
+        <span class="catalog-card-main">
+          <b>${esc(p.name)}</b>
+          <span class="muted small">${esc(metaLine || p.type)}</span>
+        </span>
+        <span class="catalog-card-tag">${have ? "Owned" : sel ? "✓" : "+"}</span>
+      </button>`;
+    }).join("") : `<p class="muted">No parts match.</p>`;
+
+    results.querySelectorAll(".catalog-card:not([disabled])").forEach((el) => {
+      el.addEventListener("click", () => {
+        const k = el.dataset.k;
+        picked.has(k) ? picked.delete(k) : picked.add(k);
+        draw();
+      });
+    });
+
+    countEl.textContent = picked.size
+      ? `${picked.size} selected`
+      : `${list.length} part${list.length === 1 ? "" : "s"}`;
+    addBtn.disabled = picked.size === 0;
+    addBtn.textContent = picked.size ? `Add ${picked.size} to collection` : "Add selected";
+  };
+
+  box.querySelector("#cat-q").addEventListener("input", (e) => { f.q = e.target.value; draw(); });
+  box.querySelectorAll(".catalog-chips").forEach((row) =>
+    row.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-key]");
+      if (!b) return;
+      f[b.dataset.key] = b.dataset.val;
+      draw();
+    }));
+  box.querySelectorAll("#cat-manual").forEach((b) => b.addEventListener("click", () => beyForm()));
+  addBtn.addEventListener("click", () => runBtn(addBtn, "Adding…", async () => {
+    const rows = cat.parts
+      .filter((p) => picked.has(key(p)))
+      .map((p) => ({ type: p.type, name: p.name, notes: "" }));
+    if (!rows.length) return;
+    await store.createMany("beys", rows);
+    await refresh();
+    modal.close();
+    render();
+    toast(`Added ${rows.length} part${rows.length === 1 ? "" : "s"} to your collection.`);
+  }));
+
+  draw();
 }
 
 // ---------------------------------------------------------------------------
