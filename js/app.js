@@ -15,6 +15,7 @@ import * as teams from "./teams.js";
 import * as friends from "./friends.js";
 import * as meta from "./meta.js";
 import * as catalog from "./catalog.js";
+import * as challonge from "./challonge.js";
 import {
   FINISHES, finishLabel, finishPts,
   matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
@@ -1274,7 +1275,10 @@ function renderTournaments(main) {
   main.innerHTML = `
     <div class="view-head">
       <h1>Tournaments</h1>
-      <button class="btn btn-primary" id="add-tournament">+ Add tournament</button>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="import-challonge">Import from Challonge</button>
+        <button class="btn btn-primary" id="add-tournament">+ Add tournament</button>
+      </div>
     </div>
     ${all.length === 0 ? "" : `
     <div class="filter-bar">
@@ -1306,6 +1310,7 @@ function renderTournaments(main) {
     </div>`}
   `;
   $("#add-tournament").addEventListener("click", () => tournamentForm());
+  $("#import-challonge").addEventListener("click", () => challongeImport());
   $$("[data-edit]", main).forEach((b) =>
     b.addEventListener("click", () => tournamentForm(state.tournaments.find((t) => t.id === b.dataset.edit)))
   );
@@ -1355,6 +1360,147 @@ function tournamentForm(existing) {
     await save("tournaments", existing, data);
   });
   modal.open(existing ? "Edit tournament" : "Add tournament", form);
+}
+
+const CHALLONGE_FORMAT_LABEL = {
+  "single elimination": "Single elimination",
+  "double elimination": "Double elimination",
+  "round robin": "Round robin",
+  "swiss": "Swiss",
+};
+
+// Pull a tournament + this player's matches in from Challonge. A direct
+// cross-origin fetch is tried first; Challonge's API doesn't send CORS
+// headers on the real response (only on the preflight), so browsers block
+// it in practice — the fallback has the user open the same URL themselves
+// (a normal navigation, not subject to CORS) and upload what they save.
+async function challongeImport() {
+  const box = document.createElement("div");
+  box.className = "challonge-import entry-form";
+  modal.open("Import from Challonge", box);
+
+  const showError = (msg) => {
+    const err = box.querySelector("#ch-error");
+    if (!err) return;
+    err.textContent = msg;
+    err.hidden = false;
+  };
+
+  const openPayload = (raw) => {
+    let normalized = null;
+    try { normalized = challonge.normalizeTournament(raw); } catch { /* stays null */ }
+    if (!normalized || !normalized.participants.length) {
+      showError("That doesn't look like Challonge tournament data (no participants found).");
+      return;
+    }
+    stepPick(normalized);
+  };
+
+  const stepLink = () => {
+    box.innerHTML = `
+      <p class="muted">Paste your Challonge tournament link (or just its slug, e.g. <code>abc123</code>).</p>
+      <label class="field"><span>Challonge link</span><input id="ch-url" placeholder="https://challonge.com/abc123" autocomplete="off" /></label>
+      <label class="field"><span>API key <span class="muted">— only needed for a private tournament</span></span><input id="ch-key" type="password" placeholder="optional" autocomplete="off" /></label>
+      <p id="ch-error" class="form-error" hidden></p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-cancel>Cancel</button>
+        <button type="button" class="btn btn-primary" id="ch-fetch">Fetch tournament</button>
+      </div>`;
+    box.querySelector("[data-cancel]").addEventListener("click", modal.close);
+    box.querySelector("#ch-fetch").addEventListener("click", (e) => runBtn(e.currentTarget, "Fetching…", async () => {
+      const id = challonge.parseChallongeInput(box.querySelector("#ch-url").value);
+      if (!id) { showError("Paste a Challonge tournament link or slug."); return; }
+      const key = box.querySelector("#ch-key").value.trim();
+      const url = challonge.apiUrl(id, key);
+      let res;
+      try {
+        res = await fetch(url, { mode: "cors" });
+      } catch {
+        stepFallback(url);
+        return;
+      }
+      if (!res.ok) {
+        if (res.status === 401) showError("That tournament is private — paste your Challonge API key above and try again.");
+        else if (res.status === 404) showError("Couldn't find that tournament — check the link.");
+        else showError(`Challonge returned an error (${res.status}).`);
+        return;
+      }
+      openPayload(await res.json());
+    }));
+  };
+
+  const stepFallback = (url) => {
+    box.innerHTML = `
+      <p class="muted">Browsers block this site from reading Challonge's data directly. Instead:</p>
+      <ol class="ch-steps">
+        <li><a href="${esc(url)}" target="_blank" rel="noopener">Open your tournament data</a> in a new tab.</li>
+        <li>Save that page as a file — <kbd>Ctrl/Cmd+S</kbd> — keeping the <b>.json</b> extension.</li>
+        <li>Upload the saved file below.</li>
+      </ol>
+      <label class="field"><span>Saved .json file</span><input type="file" id="ch-file" accept="application/json,.json" /></label>
+      <p id="ch-error" class="form-error" hidden></p>
+      <div class="form-actions"><button type="button" class="btn btn-ghost" id="ch-back">Back</button></div>`;
+    box.querySelector("#ch-back").addEventListener("click", stepLink);
+    box.querySelector("#ch-file").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try { openPayload(JSON.parse(await file.text())); }
+      catch { showError("That file isn't valid JSON."); }
+    });
+  };
+
+  const stepPick = (normalized) => {
+    const sorted = [...normalized.participants].sort((a, b) => a.name.localeCompare(b.name));
+    box.innerHTML = `
+      <p><b>${esc(normalized.name)}</b>${normalized.completedAt ? ` <span class="muted">· ${fmtDate(String(normalized.completedAt).slice(0, 10))}</span>` : ""}</p>
+      <label class="field"><span>Which one were you?</span>
+        <select id="ch-me">
+          <option value="">Select your name…</option>
+          ${sorted.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}${p.finalRank ? ` — ${esc(ordinalMaybe(p.finalRank))}` : ""}</option>`).join("")}
+        </select>
+      </label>
+      <p id="ch-error" class="form-error" hidden></p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="ch-back">Back</button>
+        <button type="button" class="btn btn-primary" id="ch-next">Continue</button>
+      </div>`;
+    box.querySelector("#ch-back").addEventListener("click", stepLink);
+    box.querySelector("#ch-next").addEventListener("click", () => {
+      const pid = box.querySelector("#ch-me").value;
+      if (!pid) { showError("Pick your name from the list."); return; }
+      stepPreview(normalized, pid);
+    });
+  };
+
+  const stepPreview = (normalized, pid) => {
+    const plan = challonge.buildImportPlan(normalized, pid);
+    plan.tournament.format = CHALLONGE_FORMAT_LABEL[plan.tournament.format] || plan.tournament.format;
+    const t = plan.tournament;
+    box.innerHTML = `
+      <p><b>${esc(t.name)}</b></p>
+      <p class="muted">${fmtDate(t.date)}${t.placement ? " · " + esc(ordinalMaybe(t.placement)) : ""} · ${t.wins}-${t.losses}${t.format ? " · " + esc(t.format) : ""}</p>
+      ${plan.matches.length ? `<ul class="ch-match-list">
+        ${plan.matches.map((m) => `<li><span class="pill pill--${m.result === "W" ? "w" : "l"}">${m.result}</span> vs ${esc(m.opponent)}${m.notes ? ` <span class="muted">(${esc(m.notes.replace("Challonge score: ", ""))})</span>` : ""}</li>`).join("")}
+      </ul>` : `<p class="muted">No completed matches found for this player.</p>`}
+      <p id="ch-error" class="form-error" hidden></p>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" id="ch-back">Back</button>
+        <button type="button" class="btn btn-primary" id="ch-import">Import</button>
+      </div>`;
+    box.querySelector("#ch-back").addEventListener("click", () => stepPick(normalized));
+    box.querySelector("#ch-import").addEventListener("click", (e) => runBtn(e.currentTarget, "Importing…", async () => {
+      const tId = await store.create("tournaments", plan.tournament);
+      if (plan.matches.length) {
+        await store.createMany("matches", plan.matches.map((m) => ({ ...m, tournamentId: tId })));
+      }
+      await refresh();
+      modal.close();
+      render();
+      toast(`Imported "${plan.tournament.name}" — ${plan.matches.length} match${plan.matches.length === 1 ? "" : "es"}.`);
+    }));
+  };
+
+  stepLink();
 }
 
 // ---------------------------------------------------------------------------

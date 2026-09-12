@@ -9,7 +9,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 
 | Section | What goes in it |
 | --- | --- |
-| **Tournaments** | Name, date, location, format, final placement, W–L, notes |
+| **Tournaments** | Name, date, location, format, final placement, W–L, notes. **Import from Challonge** — paste a tournament link, pick which participant was you, and it creates the tournament + your matches (result + score) in one go. |
 | **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes |
 | **Collection** | Owned Blades, Ratchets and Bits. **Browse catalog** opens a searchable, filterable picker (by type / role / system) with a generated icon per part — tick several and add them at once. Name fields also autocomplete from the catalog. |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
@@ -148,6 +148,7 @@ js/
   friends.js           friend codes, requests, friendships, cards, activity feed
   meta.js              community combo ratings (metaCombos/...)
   catalog.js           parts catalog loader + filter + slugify (data/parts.json)
+  challonge.js         Challonge import: URL parsing + payload shaping (no fetch)
   app.js               auth flow, views, forms, wiring
 scripts/part-slugs.mjs  `npm run parts:slugs` — list part image file names
 data/meta.json         curated tier-list snapshot (edit or PR to update)

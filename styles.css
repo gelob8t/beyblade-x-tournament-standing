@@ -646,6 +646,13 @@ textarea { resize: vertical; }
 .import-box { display: grid; gap: .9rem; }
 .import-box #import-summary { display: grid; gap: .7rem; }
 .import-box input[type="file"] { font: inherit; color: var(--muted); }
+.challonge-import input[type="file"] { font: inherit; color: var(--muted); }
+.ch-steps { margin: 0 0 .2rem; padding-left: 1.2rem; display: grid; gap: .35rem; font-size: .92rem; }
+.ch-steps li { line-height: 1.4; }
+.ch-match-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; max-height: 240px; overflow-y: auto; }
+.ch-match-list li { display: flex; align-items: center; gap: .5rem; font-size: .88rem; }
+.ch-match-list .pill { width: 26px; height: 24px; font-size: .7rem; flex: none; }
+kbd { background: var(--bg-2); border: 1px solid var(--line-bright); border-radius: 3px; padding: .05em .45em; font-family: var(--font-display); font-size: .85em; }
 .field--check { display: flex; align-items: center; gap: .55rem; cursor: pointer; }
 .field--check input { width: auto; flex: none; accent-color: var(--blue); }
 .field--check span { font-size: .9rem; color: var(--text); text-transform: none; letter-spacing: 0; }
