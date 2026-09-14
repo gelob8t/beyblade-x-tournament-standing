@@ -14,7 +14,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Collection** | Owned Blades, Ratchets and Bits. **Browse catalog** opens a searchable, filterable picker (by type / role / system) with a generated icon per part — tick several and add them at once. Name fields also autocomplete from the catalog. |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
-| **Share stats** | Generates a themed stats card (record, best finish, achievements, top deck) as a PNG. On phones, **Share…** opens the OS share sheet — any app, any social network. Everywhere else: download, copy to clipboard, or one-tap X/Facebook/WhatsApp/Reddit links. |
+| **Share stats** | Generates a themed stats card (record, best finish, achievements, top deck) as a PNG. **Share…** opens the OS share sheet where supported — any app, any social network, Instagram/TikTok included if installed. Always available: download, copy to clipboard, one-tap X/Facebook/WhatsApp/Reddit links, and an Instagram/TikTok shortcut that downloads the image ready to post from your gallery. |
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON **export** of all your data, and **import / restore** from that file (adds only what's not already there) |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 | **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |

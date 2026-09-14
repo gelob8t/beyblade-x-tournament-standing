@@ -1283,14 +1283,26 @@ const SHARE_COLORS = {
   text: "#eef2f8", muted: "#8a99b0", accent: "#bdec3f", accent2: "#38c6e8",
 };
 
+// Resolve after `ms` regardless of whether `promise` has settled, so a slow
+// or hung platform API (font loading, canvas export…) can't freeze the UI.
+function withTimeout(promise, ms, fallbackValue) {
+  return Promise.race([
+    promise,
+    new Promise((resolve) => setTimeout(() => resolve(fallbackValue), ms)),
+  ]);
+}
+
 async function ensureShareFontsLoaded() {
   const specs = [
     '700 56px "Chakra Petch"', '700 22px "Chakra Petch"', '700 42px "Chakra Petch"',
     '700 20px "Chakra Petch"', 'italic 700 54px "Chakra Petch"',
     '600 22px "Inter"', '500 22px "Inter"',
   ];
-  try { await Promise.all(specs.map((s) => document.fonts.load(s))); } catch { /* best effort */ }
-  try { await document.fonts.ready; } catch { /* ignore */ }
+  const load = (async () => {
+    try { await Promise.all(specs.map((s) => document.fonts.load(s))); } catch { /* best effort */ }
+    try { await document.fonts.ready; } catch { /* ignore */ }
+  })();
+  await withTimeout(load, 2500, undefined);
 }
 
 function loadImageEl(src) {
@@ -1484,77 +1496,95 @@ async function shareStatsCard() {
   box.innerHTML = `<p class="muted">Building your card…</p>`;
   modal.open("Share your stats", box);
 
-  const data = sharecard.buildCardData({
-    matches: state.matches, tournaments: state.tournaments, decks: state.decks,
-    achv: state.achv, profile: state.profile, team: state.team,
-  });
-
-  let canvas, blob;
   try {
-    canvas = await drawShareCard(data, state.profile.photo || "");
-    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const data = sharecard.buildCardData({
+      matches: state.matches, tournaments: state.tournaments, decks: state.decks,
+      achv: state.achv, profile: state.profile, team: state.team,
+    });
+
+    const canvas = await withTimeout(drawShareCard(data, state.profile.photo || ""), 8000, null);
+    if (!canvas) throw new Error("Timed out building the card");
+    const blob = await withTimeout(
+      new Promise((resolve) => canvas.toBlob(resolve, "image/png")), 5000, null
+    );
+    if (!blob) throw new Error("Couldn't export the card as an image");
+
+    const fileName = `beyblade-x-stats-${today()}.png`;
+    const file = new File([blob], fileName, { type: "image/png" });
+    const text = sharecard.shareText(data);
+    const shareUrl = location.origin + location.pathname;
+    const objectUrl = URL.createObjectURL(blob);
+    const canNativeShare = !!navigator.share;
+    const canCopyImage = !!(navigator.clipboard && window.ClipboardItem);
+
+    const download = () => {
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = fileName;
+      document.body.append(a);
+      a.click();
+      a.remove();
+    };
+
+    // Instagram and TikTok don't accept posts from a web page at all — the
+    // OS share sheet (Share… below, on a phone with the app installed) is
+    // the only direct route; otherwise it's download-then-post-from-gallery.
+    box.innerHTML = `
+      <div class="share-card-preview"><img src="${objectUrl}" alt="Your Beyblade X stats card" /></div>
+      <div class="share-card-actions">
+        ${canNativeShare ? `<button class="btn btn-primary" id="sc-share">Share…</button>` : ""}
+        <button class="btn ${canNativeShare ? "btn-ghost" : "btn-primary"}" id="sc-download">Download image</button>
+        <button class="btn btn-ghost" id="sc-copy"${canCopyImage ? "" : ` disabled title="Copying images isn't supported in this browser"`}>Copy image</button>
+      </div>
+      <div class="share-card-links">
+        <p class="muted small">Share directly:</p>
+        <div class="share-card-chips">
+          <a class="btn-link" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}">X / Twitter</a>
+          <a class="btn-link" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}">Facebook</a>
+          <a class="btn-link" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}">WhatsApp</a>
+          <a class="btn-link" target="_blank" rel="noopener" href="https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(text)}">Reddit</a>
+          <button type="button" class="btn-link" id="sc-ig">Instagram</button>
+          <button type="button" class="btn-link" id="sc-tt">TikTok</button>
+        </div>
+        <p class="muted small">Instagram and TikTok don't accept posts from a web page — <b>Share…</b> opens them directly if you're on your phone with the app installed; otherwise Instagram/TikTok above downloads the image so you can post it from your gallery.</p>
+      </div>
+    `;
+
+    box.querySelector("#sc-download").addEventListener("click", download);
+    box.querySelector("#sc-ig").addEventListener("click", () => { download(); toast("Image downloaded — open Instagram and post it from your gallery."); });
+    box.querySelector("#sc-tt").addEventListener("click", () => { download(); toast("Image downloaded — open TikTok and post it from your gallery."); });
+
+    const copyBtn = box.querySelector("#sc-copy");
+    if (canCopyImage) {
+      copyBtn.addEventListener("click", () => runBtn(copyBtn, "Copying…", async () => {
+        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+        toast("Image copied — paste it anywhere.");
+      }));
+    }
+
+    const shareBtn = box.querySelector("#sc-share");
+    if (shareBtn) {
+      shareBtn.addEventListener("click", () => runBtn(shareBtn, "Sharing…", async () => {
+        let canFiles = false;
+        try { canFiles = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { canFiles = false; }
+        try {
+          if (canFiles) {
+            await navigator.share({ files: [file], title: "My Beyblade X Journey", text });
+          } else {
+            download();
+            await navigator.share({ title: "My Beyblade X Journey", text, url: shareUrl });
+            toast("Image downloaded — attach it in the share sheet if it doesn't already have one.");
+          }
+        } catch (err) {
+          if (err && err.name === "AbortError") return; // user closed the sheet — not an error
+          console.error(err);
+          toast(`Couldn't open the share sheet${err && err.message ? ": " + err.message : ""}. Try Download or Copy instead.`, "err");
+        }
+      }));
+    }
   } catch (err) {
     console.error(err);
-    blob = null;
-  }
-  if (!blob) {
-    box.innerHTML = `<p class="form-error">Couldn't build the card image. Try again in a moment.</p>`;
-    return;
-  }
-
-  const fileName = `beyblade-x-stats-${today()}.png`;
-  const file = new File([blob], fileName, { type: "image/png" });
-  const text = sharecard.shareText(data);
-  const shareUrl = location.origin + location.pathname;
-  const objectUrl = URL.createObjectURL(blob);
-  const canShareFiles = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
-  const canCopyImage = !!(navigator.clipboard && window.ClipboardItem);
-
-  box.innerHTML = `
-    <div class="share-card-preview"><img src="${objectUrl}" alt="Your Beyblade X stats card" /></div>
-    <div class="share-card-actions">
-      ${canShareFiles ? `<button class="btn btn-primary" id="sc-share">Share…</button>` : ""}
-      <button class="btn ${canShareFiles ? "btn-ghost" : "btn-primary"}" id="sc-download">Download image</button>
-      <button class="btn btn-ghost" id="sc-copy"${canCopyImage ? "" : " disabled"}>Copy image</button>
-    </div>
-    ${canShareFiles ? "" : `
-    <div class="share-card-links">
-      <p class="muted small">Download the image above, then post it — or share a quick text update:</p>
-      <div class="share-card-chips">
-        <a class="btn-link" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}">X / Twitter</a>
-        <a class="btn-link" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}">Facebook</a>
-        <a class="btn-link" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}">WhatsApp</a>
-        <a class="btn-link" target="_blank" rel="noopener" href="https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(text)}">Reddit</a>
-      </div>
-    </div>`}
-  `;
-
-  box.querySelector("#sc-download").addEventListener("click", () => {
-    const a = document.createElement("a");
-    a.href = objectUrl;
-    a.download = fileName;
-    document.body.append(a);
-    a.click();
-    a.remove();
-  });
-
-  const copyBtn = box.querySelector("#sc-copy");
-  if (canCopyImage) {
-    copyBtn.addEventListener("click", () => runBtn(copyBtn, "Copying…", async () => {
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-      toast("Image copied — paste it anywhere.");
-    }));
-  }
-
-  const shareBtn = box.querySelector("#sc-share");
-  if (shareBtn) {
-    shareBtn.addEventListener("click", () => runBtn(shareBtn, "Sharing…", async () => {
-      try {
-        await navigator.share({ files: [file], title: "My Beyblade X Journey", text });
-      } catch (err) {
-        if (err && err.name !== "AbortError") toast("Couldn't open the share sheet.", "err");
-      }
-    }));
+    box.innerHTML = `<p class="form-error">Couldn't build the card (${esc(err.message || "unknown error")}). Try again, or use Export my data instead.</p>`;
   }
 }
 
