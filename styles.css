@@ -653,6 +653,17 @@ textarea { resize: vertical; }
 .ch-match-list li { display: flex; align-items: center; gap: .5rem; font-size: .88rem; }
 .ch-match-list .pill { width: 26px; height: 24px; font-size: .7rem; flex: none; }
 kbd { background: var(--bg-2); border: 1px solid var(--line-bright); border-radius: 3px; padding: .05em .45em; font-family: var(--font-display); font-size: .85em; }
+
+/* ---------- share stats card ---------- */
+.share-card-modal { display: grid; gap: 1rem; }
+.share-card-preview {
+  border: 1px solid var(--line); background: var(--bg-2);
+  clip-path: polygon(0 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%);
+}
+.share-card-preview img { display: block; width: 100%; height: auto; }
+.share-card-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
+.share-card-links { border-top: 1px solid var(--line); padding-top: .9rem; }
+.share-card-chips { display: flex; flex-wrap: wrap; gap: 1rem .9rem; margin-top: .3rem; }
 .field--check { display: flex; align-items: center; gap: .55rem; cursor: pointer; }
 .field--check input { width: auto; flex: none; accent-color: var(--blue); }
 .field--check span { font-size: .9rem; color: var(--text); text-transform: none; letter-spacing: 0; }

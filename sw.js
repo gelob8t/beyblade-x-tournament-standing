@@ -18,6 +18,7 @@ const SHELL = [
   "./js/meta.js",
   "./js/catalog.js",
   "./js/challonge.js",
+  "./js/sharecard.js",
   "./data/meta.json",
   "./data/parts.json",
   "./manifest.webmanifest",

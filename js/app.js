@@ -16,6 +16,7 @@ import * as friends from "./friends.js";
 import * as meta from "./meta.js";
 import * as catalog from "./catalog.js";
 import * as challonge from "./challonge.js";
+import * as sharecard from "./sharecard.js";
 import {
   FINISHES, finishLabel, finishPts,
   matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
@@ -987,7 +988,10 @@ function renderDashboard(main) {
   main.innerHTML = `
     <div class="view-head">
       <h1>Dashboard</h1>
-      <p class="muted">${matches.length} matches · ${tournaments.length} tournaments</p>
+      <div class="head-actions">
+        <span class="muted">${matches.length} matches · ${tournaments.length} tournaments</span>
+        <button class="btn btn-ghost btn-sm" id="share-stats">Share stats</button>
+      </div>
     </div>
 
     <div class="identity">
@@ -1021,6 +1025,7 @@ function renderDashboard(main) {
       ${achvPanel(true)}`}
   `;
   wireFeedClicks(main);
+  $("#share-stats").addEventListener("click", () => shareStatsCard());
   const gs = $("#go-stats");
   if (gs) gs.addEventListener("click", () => switchView("stats"));
   const ga = $("#go-achv");
@@ -1206,7 +1211,13 @@ function renderStats(main) {
   const myDeck = groupRecord(played, (m) => (m.myDeck || "").trim() || "Unspecified");
 
   main.innerHTML = `
-    <div class="view-head"><h1>Stats</h1><p class="muted">${played.length} rated matches</p></div>
+    <div class="view-head">
+      <h1>Stats</h1>
+      <div class="head-actions">
+        <span class="muted">${played.length} rated matches</span>
+        <button class="btn btn-ghost btn-sm" id="share-stats">Share stats</button>
+      </div>
+    </div>
 
     <div class="stat-grid">
       ${statCard("Match win rate", rate + "%", `${wins}W – ${played.length - wins}L`)}
@@ -1238,6 +1249,7 @@ function renderStats(main) {
 
     ${achvPanel(false)}
   `;
+  $("#share-stats").addEventListener("click", () => shareStatsCard());
 }
 
 function monthLabel(k) {
@@ -1259,6 +1271,295 @@ function recordTable(title, rows, col) {
       </tr>`).join("")}</tbody>
     </table></div>
   </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Share stats card — a generated PNG, shared via the OS share sheet
+// (navigator.share, which is what reaches "every" social app on a phone)
+// or downloaded/copied for the rest. No canvas libraries — plain 2D canvas.
+// ---------------------------------------------------------------------------
+const SHARE_COLORS = {
+  bg: "#06080d", panel: "#182234", panel2: "#0c111b", line: "#26344a",
+  text: "#eef2f8", muted: "#8a99b0", accent: "#bdec3f", accent2: "#38c6e8",
+};
+
+async function ensureShareFontsLoaded() {
+  const specs = [
+    '700 56px "Chakra Petch"', '700 22px "Chakra Petch"', '700 42px "Chakra Petch"',
+    '700 20px "Chakra Petch"', 'italic 700 54px "Chakra Petch"',
+    '600 22px "Inter"', '500 22px "Inter"',
+  ];
+  try { await Promise.all(specs.map((s) => document.fonts.load(s))); } catch { /* best effort */ }
+  try { await document.fonts.ready; } catch { /* ignore */ }
+}
+
+function loadImageEl(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image failed to load"));
+    img.src = src;
+  });
+}
+
+function shareSplitGradient(ctx, x0, y0, x1, y1) {
+  const g = ctx.createLinearGradient(x0, y0, x1, y1);
+  g.addColorStop(0, SHARE_COLORS.accent);
+  g.addColorStop(0.46, SHARE_COLORS.accent);
+  g.addColorStop(0.54, SHARE_COLORS.accent2);
+  g.addColorStop(1, SHARE_COLORS.accent2);
+  return g;
+}
+
+// angular corner-cut rect path — echoes the app's .notch cards
+function shareNotchPath(ctx, x, y, w, h, cut) {
+  ctx.beginPath();
+  ctx.moveTo(x + cut, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h - cut);
+  ctx.lineTo(x + w - cut, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x, y + cut);
+  ctx.closePath();
+}
+
+function shareTruncate(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let s = text;
+  while (s.length > 1 && ctx.measureText(s + "…").width > maxWidth) s = s.slice(0, -1);
+  return s + "…";
+}
+
+function shareTile(ctx, x, y, w, h, label, value, sub) {
+  shareNotchPath(ctx, x, y, w, h, 14);
+  const g = ctx.createLinearGradient(x, y, x, y + h);
+  g.addColorStop(0, SHARE_COLORS.panel);
+  g.addColorStop(1, SHARE_COLORS.panel2);
+  ctx.fillStyle = g;
+  ctx.fill();
+  ctx.strokeStyle = SHARE_COLORS.line;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = shareSplitGradient(ctx, x, y, x, y + 40);
+  ctx.fillRect(x, y, 4, 40);
+
+  const padX = 28;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = SHARE_COLORS.muted;
+  ctx.font = '700 20px "Chakra Petch"';
+  ctx.fillText(shareTruncate(ctx, label, w - padX * 2), x + padX, y + 40);
+  ctx.fillStyle = SHARE_COLORS.text;
+  ctx.font = 'italic 700 54px "Chakra Petch"';
+  ctx.fillText(shareTruncate(ctx, value, w - padX * 2), x + padX, y + 102);
+  ctx.fillStyle = SHARE_COLORS.muted;
+  ctx.font = '500 22px "Inter"';
+  ctx.fillText(shareTruncate(ctx, sub, w - padX * 2), x + padX, y + 136);
+}
+
+/** Render the stats card to a fresh 1080x1080 canvas. */
+async function drawShareCard(data, avatarSrc) {
+  const SIZE = 1080, PAD = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const ctx = canvas.getContext("2d");
+  await ensureShareFontsLoaded();
+
+  ctx.fillStyle = SHARE_COLORS.bg;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  let g = ctx.createRadialGradient(160, 60, 0, 160, 60, 640);
+  g.addColorStop(0, "rgba(189,236,63,.10)");
+  g.addColorStop(1, "rgba(189,236,63,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, SIZE, SIZE);
+  g = ctx.createRadialGradient(SIZE - 120, 20, 0, SIZE - 120, 20, 640);
+  g.addColorStop(0, "rgba(56,198,232,.13)");
+  g.addColorStop(1, "rgba(56,198,232,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, SIZE, SIZE);
+
+  ctx.save();
+  ctx.globalAlpha = 0.05;
+  ctx.fillStyle = "#ffffff";
+  ctx.font = '700 640px "Chakra Petch"';
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillText("X", SIZE - 420, SIZE + 140);
+  ctx.restore();
+
+  // header: avatar + name + meta, brand mark top-right
+  const avatarSize = 108;
+  let headX = PAD;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(PAD + avatarSize / 2, PAD + avatarSize / 2, avatarSize / 2, 0, Math.PI * 2);
+  ctx.closePath();
+  ctx.clip();
+  let drewPhoto = false;
+  if (avatarSrc) {
+    try {
+      const img = await loadImageEl(avatarSrc);
+      ctx.drawImage(img, PAD, PAD, avatarSize, avatarSize);
+      drewPhoto = true;
+    } catch { /* fall through to initials */ }
+  }
+  if (!drewPhoto) {
+    ctx.fillStyle = shareSplitGradient(ctx, PAD, PAD, PAD + avatarSize, PAD + avatarSize);
+    ctx.fillRect(PAD, PAD, avatarSize, avatarSize);
+    ctx.fillStyle = "#06080d";
+    ctx.font = '700 40px "Chakra Petch"';
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const ini = (data.name || "?").trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "?";
+    ctx.fillText(ini, PAD + avatarSize / 2, PAD + avatarSize / 2 + 3);
+  }
+  ctx.restore();
+  headX = PAD + avatarSize + 28;
+
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = SHARE_COLORS.text;
+  ctx.font = '700 50px "Chakra Petch"';
+  ctx.fillText(shareTruncate(ctx, (data.name || "Blader").toUpperCase(), SIZE - headX - PAD - 260), headX, PAD + 48);
+
+  const metaParts = [data.team ? (data.team.tag ? `[${data.team.tag}] ${data.team.name}` : data.team.name) : "", data.region].filter(Boolean);
+  if (metaParts.length) {
+    ctx.fillStyle = SHARE_COLORS.muted;
+    ctx.font = '600 24px "Inter"';
+    ctx.fillText(shareTruncate(ctx, metaParts.join("   ·   "), SIZE - headX - PAD), headX, PAD + 86);
+  }
+
+  ctx.textAlign = "right";
+  ctx.fillStyle = SHARE_COLORS.muted;
+  ctx.font = '700 22px "Chakra Petch"';
+  ctx.fillText("BEYBLADE X", SIZE - PAD, PAD + 16);
+  ctx.fillStyle = SHARE_COLORS.accent2;
+  ctx.fillText("JOURNEY", SIZE - PAD, PAD + 42);
+  ctx.textAlign = "left";
+
+  const divY = PAD + avatarSize + 26;
+  ctx.fillStyle = shareSplitGradient(ctx, PAD, divY, SIZE - PAD, divY);
+  ctx.fillRect(PAD, divY, SIZE - PAD * 2, 3);
+
+  // 2x2 stat grid
+  const tiles = [
+    { label: "MATCH WIN RATE", value: Math.round(data.matches.rate * 100) + "%", sub: `${data.matches.wins}W – ${data.matches.losses}L` },
+    { label: "GAME WIN RATE", value: Math.round(data.games.rate * 100) + "%", sub: `${data.games.w}W – ${data.games.l}L games` },
+  ];
+  tiles.push(data.bestPlacement
+    ? { label: "BEST FINISH", value: ordinal(data.bestPlacement), sub: `${data.tournaments} tournament${data.tournaments === 1 ? "" : "s"}` }
+    : { label: "TOURNAMENTS", value: String(data.tournaments), sub: data.tournaments ? "logged" : "none yet" });
+  tiles.push({ label: "ACHIEVEMENTS", value: `${data.achv.done}/${data.achv.total}`, sub: "badges unlocked" });
+
+  const gridY = divY + 44, gap = 24;
+  const tileW = (SIZE - PAD * 2 - gap) / 2, tileH = 168;
+  tiles.forEach((t, i) => {
+    const col = i % 2, row = Math.floor(i / 2);
+    shareTile(ctx, PAD + col * (tileW + gap), gridY + row * (tileH + gap), tileW, tileH, t.label, t.value, t.sub);
+  });
+
+  // highlight strip
+  const chips = [];
+  if (data.streak && data.streak.current >= 2) chips.push(`${data.streak.type === "win" ? "🔥" : "🧊"} ${data.streak.current}-match ${data.streak.type} streak`);
+  if (data.topDeck) chips.push(`🃏 Top deck: ${data.topDeck.name} (${data.topDeck.w}-${data.topDeck.l})`);
+  if (chips.length) {
+    ctx.fillStyle = SHARE_COLORS.text;
+    ctx.font = '600 25px "Inter"';
+    ctx.fillText(shareTruncate(ctx, chips.join("     ·     "), SIZE - PAD * 2), PAD, gridY + tileH * 2 + gap * 2 + 4);
+  }
+
+  // footer
+  const footY = SIZE - 56;
+  ctx.strokeStyle = SHARE_COLORS.line;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, footY - 34); ctx.lineTo(SIZE - PAD, footY - 34); ctx.stroke();
+  ctx.font = '600 22px "Inter"';
+  ctx.fillStyle = SHARE_COLORS.muted;
+  const prefix = "Track your Beyblade X journey free — ";
+  ctx.fillText(prefix, PAD, footY);
+  const prefixW = ctx.measureText(prefix).width;
+  ctx.font = '600 22px "Inter"';
+  ctx.fillStyle = SHARE_COLORS.accent;
+  const urlText = location.host + (location.pathname === "/" ? "" : location.pathname.replace(/\/$/, ""));
+  ctx.fillText(shareTruncate(ctx, urlText, SIZE - PAD - (PAD + prefixW)), PAD + prefixW, footY);
+
+  return canvas;
+}
+
+async function shareStatsCard() {
+  const box = document.createElement("div");
+  box.className = "share-card-modal";
+  box.innerHTML = `<p class="muted">Building your card…</p>`;
+  modal.open("Share your stats", box);
+
+  const data = sharecard.buildCardData({
+    matches: state.matches, tournaments: state.tournaments,
+    achv: state.achv, profile: state.profile, team: state.team,
+  });
+
+  let canvas, blob;
+  try {
+    canvas = await drawShareCard(data, state.profile.photo || "");
+    blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+  } catch (err) {
+    console.error(err);
+    blob = null;
+  }
+  if (!blob) {
+    box.innerHTML = `<p class="form-error">Couldn't build the card image. Try again in a moment.</p>`;
+    return;
+  }
+
+  const fileName = `beyblade-x-stats-${today()}.png`;
+  const file = new File([blob], fileName, { type: "image/png" });
+  const text = sharecard.shareText(data);
+  const shareUrl = location.origin + location.pathname;
+  const objectUrl = URL.createObjectURL(blob);
+  const canShareFiles = !!(navigator.canShare && navigator.share && navigator.canShare({ files: [file] }));
+  const canCopyImage = !!(navigator.clipboard && window.ClipboardItem);
+
+  box.innerHTML = `
+    <div class="share-card-preview"><img src="${objectUrl}" alt="Your Beyblade X stats card" /></div>
+    <div class="share-card-actions">
+      ${canShareFiles ? `<button class="btn btn-primary" id="sc-share">Share…</button>` : ""}
+      <button class="btn ${canShareFiles ? "btn-ghost" : "btn-primary"}" id="sc-download">Download image</button>
+      <button class="btn btn-ghost" id="sc-copy"${canCopyImage ? "" : " disabled"}>Copy image</button>
+    </div>
+    ${canShareFiles ? "" : `
+    <div class="share-card-links">
+      <p class="muted small">Download the image above, then post it — or share a quick text update:</p>
+      <div class="share-card-chips">
+        <a class="btn-link" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}">X / Twitter</a>
+        <a class="btn-link" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}">Facebook</a>
+        <a class="btn-link" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}">WhatsApp</a>
+        <a class="btn-link" target="_blank" rel="noopener" href="https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(text)}">Reddit</a>
+      </div>
+    </div>`}
+  `;
+
+  box.querySelector("#sc-download").addEventListener("click", () => {
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.append(a);
+    a.click();
+    a.remove();
+  });
+
+  const copyBtn = box.querySelector("#sc-copy");
+  if (canCopyImage) {
+    copyBtn.addEventListener("click", () => runBtn(copyBtn, "Copying…", async () => {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast("Image copied — paste it anywhere.");
+    }));
+  }
+
+  const shareBtn = box.querySelector("#sc-share");
+  if (shareBtn) {
+    shareBtn.addEventListener("click", () => runBtn(shareBtn, "Sharing…", async () => {
+      try {
+        await navigator.share({ files: [file], title: "My Beyblade X Journey", text });
+      } catch (err) {
+        if (err && err.name !== "AbortError") toast("Couldn't open the share sheet.", "err");
+      }
+    }));
+  }
 }
 
 // ---------------------------------------------------------------------------

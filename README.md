@@ -14,6 +14,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Collection** | Owned Blades, Ratchets and Bits. **Browse catalog** opens a searchable, filterable picker (by type / role / system) with a generated icon per part — tick several and add them at once. Name fields also autocomplete from the catalog. |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
+| **Share stats** | Generates a themed stats card (record, best finish, achievements, top deck) as a PNG. On phones, **Share…** opens the OS share sheet — any app, any social network. Everywhere else: download, copy to clipboard, or one-tap X/Facebook/WhatsApp/Reddit links. |
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON **export** of all your data, and **import / restore** from that file (adds only what's not already there) |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
 | **Friends** | Add bladers by friend code; accept/decline requests; friends list showing each friend's record and win rate |
@@ -149,6 +150,7 @@ js/
   meta.js              community combo ratings (metaCombos/...)
   catalog.js           parts catalog loader + filter + slugify (data/parts.json)
   challonge.js         Challonge import: URL parsing + payload shaping (no fetch)
+  sharecard.js         share-stats data shaping (canvas drawing lives in app.js)
   app.js               auth flow, views, forms, wiring
 scripts/part-slugs.mjs  `npm run parts:slugs` — list part image file names
 data/meta.json         curated tier-list snapshot (edit or PR to update)
