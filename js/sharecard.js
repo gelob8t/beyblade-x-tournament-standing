@@ -4,10 +4,10 @@
 import { matchResult, groupRecord, streaks, ordinal } from "./stats.js";
 
 /**
- * @param {{matches?:array, tournaments?:array, achv?:array,
+ * @param {{matches?:array, tournaments?:array, decks?:array, achv?:array,
  *          profile?:object, team?:object|null}} input
  */
-export function buildCardData({ matches = [], tournaments = [], achv = [], profile = {}, team = null } = {}) {
+export function buildCardData({ matches = [], tournaments = [], decks = [], achv = [], profile = {}, team = null } = {}) {
   const played = matches.filter((m) => matchResult(m) !== "—");
   const wins = played.filter((m) => matchResult(m) === "W").length;
   const losses = played.length - wins;
@@ -35,6 +35,7 @@ export function buildCardData({ matches = [], tournaments = [], achv = [], profi
     tournaments: tournaments.length,
     bestPlacement,
     topDeck: topDeck ? { name: topDeck.name, w: topDeck.w, l: topDeck.l } : null,
+    decksCount: decks.length,
     streak: current > 0 ? { current, type } : null,
     achv: { done: achv.filter((a) => a.done).length, total: achv.length },
   };

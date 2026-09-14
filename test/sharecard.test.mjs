@@ -33,6 +33,12 @@ test("buildCardData: match + game records, best placement, top deck, streak, ach
   assert.equal(d.achv.total, 3);
 });
 
+test("buildCardData: decksCount reflects the decks list, independent of match history", () => {
+  const d = buildCardData({ matches: MATCHES, decks: [{ name: "Sword Rush" }, { name: "Shield Wall" }, { name: "Bench" }] });
+  assert.equal(d.decksCount, 3);
+  assert.equal(buildCardData({}).decksCount, 0);
+});
+
 test("buildCardData: streak reflects the most recent run", () => {
   const d = buildCardData({ matches: MATCHES });
   // chronological results: W, W, L, L -> current streak is 2 losses

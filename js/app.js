@@ -1437,7 +1437,7 @@ async function drawShareCard(data, avatarSrc) {
   ctx.fillStyle = shareSplitGradient(ctx, PAD, divY, SIZE - PAD, divY);
   ctx.fillRect(PAD, divY, SIZE - PAD * 2, 3);
 
-  // 2x2 stat grid
+  // 3x2 stat grid
   const tiles = [
     { label: "MATCH WIN RATE", value: Math.round(data.matches.rate * 100) + "%", sub: `${data.matches.wins}W – ${data.matches.losses}L` },
     { label: "GAME WIN RATE", value: Math.round(data.games.rate * 100) + "%", sub: `${data.games.w}W – ${data.games.l}L games` },
@@ -1446,6 +1446,12 @@ async function drawShareCard(data, avatarSrc) {
     ? { label: "BEST FINISH", value: ordinal(data.bestPlacement), sub: `${data.tournaments} tournament${data.tournaments === 1 ? "" : "s"}` }
     : { label: "TOURNAMENTS", value: String(data.tournaments), sub: data.tournaments ? "logged" : "none yet" });
   tiles.push({ label: "ACHIEVEMENTS", value: `${data.achv.done}/${data.achv.total}`, sub: "badges unlocked" });
+  tiles.push(data.streak
+    ? { label: "CURRENT STREAK", value: `${data.streak.current}${data.streak.type === "win" ? "W" : "L"}`, sub: data.streak.type === "win" ? "win streak" : "loss streak" }
+    : { label: "CURRENT STREAK", value: "—", sub: "no matches yet" });
+  tiles.push(data.topDeck
+    ? { label: "TOP DECK", value: data.topDeck.name, sub: `${data.topDeck.w}-${data.topDeck.l} record` }
+    : { label: "DECKS BUILT", value: String(data.decksCount), sub: data.decksCount ? "in your binder" : "none yet" });
 
   const gridY = divY + 44, gap = 24;
   const tileW = (SIZE - PAD * 2 - gap) / 2, tileH = 168;
@@ -1453,16 +1459,6 @@ async function drawShareCard(data, avatarSrc) {
     const col = i % 2, row = Math.floor(i / 2);
     shareTile(ctx, PAD + col * (tileW + gap), gridY + row * (tileH + gap), tileW, tileH, t.label, t.value, t.sub);
   });
-
-  // highlight strip
-  const chips = [];
-  if (data.streak && data.streak.current >= 2) chips.push(`${data.streak.type === "win" ? "🔥" : "🧊"} ${data.streak.current}-match ${data.streak.type} streak`);
-  if (data.topDeck) chips.push(`🃏 Top deck: ${data.topDeck.name} (${data.topDeck.w}-${data.topDeck.l})`);
-  if (chips.length) {
-    ctx.fillStyle = SHARE_COLORS.text;
-    ctx.font = '600 25px "Inter"';
-    ctx.fillText(shareTruncate(ctx, chips.join("     ·     "), SIZE - PAD * 2), PAD, gridY + tileH * 2 + gap * 2 + 4);
-  }
 
   // footer
   const footY = SIZE - 56;
@@ -1489,7 +1485,7 @@ async function shareStatsCard() {
   modal.open("Share your stats", box);
 
   const data = sharecard.buildCardData({
-    matches: state.matches, tournaments: state.tournaments,
+    matches: state.matches, tournaments: state.tournaments, decks: state.decks,
     achv: state.achv, profile: state.profile, team: state.team,
   });
 
