@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-07",
+  "updated": "2026-09-14",
   "note": "Starting snapshot compiled from competitive results and community consensus through early 2026. The Beyblade X meta shifts fast — treat this as a baseline and use the community ratings below to keep it current.",
   "roles": [
     "Attack",
@@ -293,6 +293,17 @@
       "note": "The attack benchmark — commit to the bank shot."
     },
     {
+      "blade": "Wizard Rod",
+      "ratchet": "5-70",
+      "bit": "Point",
+      "role": "Stamina",
+      "tier": "S",
+      "votes": 1,
+      "score": 5,
+      "trend": "same",
+      "note": "Premier stamina; wins the long spins."
+    },
+    {
       "blade": "Cobalt Drake",
       "ratchet": "3-60",
       "bit": "Rush",
@@ -313,17 +324,6 @@
       "score": 0,
       "trend": "same",
       "note": "CX attack top pick."
-    },
-    {
-      "blade": "Wizard Rod",
-      "ratchet": "5-70",
-      "bit": "Point",
-      "role": "Stamina",
-      "tier": "S",
-      "votes": 0,
-      "score": 0,
-      "trend": "same",
-      "note": "Premier stamina; wins the long spins."
     },
     {
       "blade": "Phoenix Wing",
@@ -392,6 +392,6 @@
       "note": "Anti-attack, disrupts the aggressor's path."
     }
   ],
-  "refreshedAt": "2026-09-08T05:53:27.003Z",
-  "communityVotes": 1
+  "refreshedAt": "2026-09-14T12:14:38.575Z",
+  "communityVotes": 2
 }
