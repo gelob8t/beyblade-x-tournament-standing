@@ -20,6 +20,7 @@ import * as sharecard from "./sharecard.js";
 import {
   FINISHES, finishLabel, finishPts,
   matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
+  comboKey, beyRecord,
 } from "./stats.js";
 
 // ---------------------------------------------------------------------------
@@ -963,6 +964,7 @@ function renderDashboard(main) {
     .map((t) => Number(t.placement))
     .filter((n) => Number.isFinite(n) && n > 0);
   const best = placements.length ? Math.min(...placements) : null;
+  const topBey = beyRecord(matches, 1)[0] || null;
 
   // win rate by deck
   const byDeck = {};
@@ -1008,6 +1010,7 @@ function renderDashboard(main) {
       ${statCard("Game win rate", pct(gW, gW + gL) + "%", `${gW}W – ${gL}L games`)}
       ${statCard("Tournaments", tournaments.length, best ? `Best finish: ${ordinal(best)}` : "No placements yet")}
       ${statCard("Decks tracked", decks.length, `${state.beys.length} parts in collection`)}
+      ${topBey ? statCard("Top bey", topBey.blade || topBey.name, `${Math.round(topBey.rate * 100)}% (${topBey.w}W – ${topBey.l}L)`) : ""}
     </div>
 
     ${feedPanel()}
@@ -1209,6 +1212,7 @@ function renderStats(main) {
   // matchup vs opponent deck
   const vsDeck = groupRecord(played, (m) => (m.opponentDeck || "").trim());
   const myDeck = groupRecord(played, (m) => (m.myDeck || "").trim() || "Unspecified");
+  const beyRows = beyRecord(state.matches); // per-game, not per-match — a deck can mix beys
 
   main.innerHTML = `
     <div class="view-head">
@@ -1244,6 +1248,10 @@ function renderStats(main) {
     </div>
 
     ${recordTable("Your decks", myDeck, "Deck")}
+    ${beyRows.length ? recordTable("Bey performance", beyRows, "Bey") : `<section class="panel">
+      <h2>Bey performance</h2>
+      <p class="muted">Tag which bey played each game — in Log match or Live scoring, once a deck has combos — to see each bey's own record here.</p>
+    </section>`}
     ${recordTable("Head-to-head", h2h, "Opponent")}
     ${vsDeck.length ? recordTable("Vs. opponent bey / deck", vsDeck, "Their bey") : ""}
 
@@ -1930,53 +1938,78 @@ function debounce(fn, ms) {
   return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
 }
 
+/** A deck's non-empty combo slots, for "which bey did you use this game" pickers. */
+function deckComboOptions(deckName) {
+  const deck = state.decks.find((d) => d.name === deckName);
+  return (deck?.combos || [])
+    .map((c, i) => ({ idx: i, combo: c }))
+    .filter((o) => o.combo && (o.combo.blade || o.combo.ratchet || o.combo.bit));
+}
+
+function comboLabel(c) {
+  return [c.blade, c.ratchet, c.bit].filter(Boolean).join(" / ") || "—";
+}
+
+function sameCombo(a, b) {
+  return !!a && !!b && comboKey(a.blade, a.ratchet, a.bit) === comboKey(b.blade, b.ratchet, b.bit);
+}
+
 function matchForm(existing, template) {
   const base = existing || (template
     ? { date: today(), tournamentId: template.tournamentId || null, myDeck: template.myDeck || "" }
     : {});
   const games = structuredClone(existing?.games || []);
+  let deckName = base.myDeck || "";
 
   const deckOptions = [
     { value: "", label: "— none —" },
     ...state.decks.map((d) => ({ value: d.name, label: d.name })),
   ];
 
-  const gamesSection = () => {
-    const box = document.createElement("div");
-    box.className = "games-editor";
-    const draw = () => {
-      box.innerHTML = `<div class="field"><span>Games</span></div>`;
-      games.forEach((g, i) => {
-        const row = document.createElement("div");
-        row.className = "game-edit-row";
-        row.innerHTML = `
-          <select data-k="winner">
-            <option value="me"${g.winner === "me" ? " selected" : ""}>I won</option>
-            <option value="opp"${g.winner === "opp" ? " selected" : ""}>Opponent won</option>
-          </select>
-          <select data-k="finish">
-            ${FINISHES.map((f) => `<option value="${f.key}"${g.finish === f.key ? " selected" : ""}>${f.label} (${f.pts}pt)</option>`).join("")}
-          </select>
-          <button type="button" class="btn btn-ghost btn-sm danger" data-rm="${i}">✕</button>`;
-        row.querySelector('[data-k="winner"]').addEventListener("change", (e) => (games[i].winner = e.target.value));
-        row.querySelector('[data-k="finish"]').addEventListener("change", (e) => (games[i].finish = e.target.value));
-        row.querySelector("[data-rm]").addEventListener("click", () => { games.splice(i, 1); draw(); });
-        box.append(row);
+  const gamesBox = document.createElement("div");
+  gamesBox.className = "games-editor";
+  const drawGames = () => {
+    const comboOpts = deckComboOptions(deckName);
+    gamesBox.innerHTML = `<div class="field"><span>Games</span></div>`;
+    games.forEach((g, i) => {
+      const row = document.createElement("div");
+      row.className = "game-edit-row";
+      row.innerHTML = `
+        <select data-k="winner">
+          <option value="me"${g.winner === "me" ? " selected" : ""}>I won</option>
+          <option value="opp"${g.winner === "opp" ? " selected" : ""}>Opponent won</option>
+        </select>
+        <select data-k="finish">
+          ${FINISHES.map((f) => `<option value="${f.key}"${g.finish === f.key ? " selected" : ""}>${f.label} (${f.pts}pt)</option>`).join("")}
+        </select>
+        ${comboOpts.length ? `<select data-k="combo">
+          <option value="">Bey used — skip</option>
+          ${comboOpts.map((o) => `<option value="${o.idx}"${sameCombo(g.combo, o.combo) ? " selected" : ""}>${esc(comboLabel(o.combo))}</option>`).join("")}
+        </select>` : ""}
+        <button type="button" class="btn btn-ghost btn-sm danger" data-rm="${i}">✕</button>`;
+      row.querySelector('[data-k="winner"]').addEventListener("change", (e) => (games[i].winner = e.target.value));
+      row.querySelector('[data-k="finish"]').addEventListener("change", (e) => (games[i].finish = e.target.value));
+      const comboSel = row.querySelector('[data-k="combo"]');
+      if (comboSel) comboSel.addEventListener("change", (e) => {
+        games[i].combo = e.target.value === "" ? null : { ...comboOpts[Number(e.target.value)].combo };
       });
-      const add = document.createElement("button");
-      add.type = "button";
-      add.className = "btn btn-ghost btn-sm";
-      add.textContent = "+ Add game";
-      add.addEventListener("click", () => { games.push({ winner: "me", finish: "Spin" }); draw(); });
-      box.append(add);
-      const hint = document.createElement("p");
-      hint.className = "muted small";
-      hint.textContent = "First to 4 points wins. Leave empty and set the result manually below.";
-      box.append(hint);
-    };
-    draw();
-    return box;
+      row.querySelector("[data-rm]").addEventListener("click", () => { games.splice(i, 1); drawGames(); });
+      gamesBox.append(row);
+    });
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "btn btn-ghost btn-sm";
+    add.textContent = "+ Add game";
+    add.addEventListener("click", () => { games.push({ winner: "me", finish: "Spin" }); drawGames(); });
+    gamesBox.append(add);
+    const hint = document.createElement("p");
+    hint.className = "muted small";
+    hint.textContent = comboOpts.length
+      ? "First to 4 points wins. Tag which bey played each game to track its own record in Stats."
+      : "First to 4 points wins. Leave empty and set the result manually below. Give your deck combos (Decks tab) to tag which bey played each game.";
+    gamesBox.append(hint);
   };
+  drawGames();
 
   const { form, values } = buildForm([
     { name: "date", label: "Date", type: "date", default: today() },
@@ -1987,12 +2020,17 @@ function matchForm(existing, template) {
     { name: "opponent", label: "Opponent", required: true, placeholder: "Blader name" },
     { name: "myDeck", label: "My deck", type: "select", options: deckOptions },
     { name: "opponentDeck", label: "Opponent deck (optional)", placeholder: "e.g. Dran Sword" },
-    { type: "custom", render: gamesSection },
+    { type: "custom", render: () => gamesBox },
     { name: "result", label: "Result (if no games above)", type: "select", options: [
       { value: "", label: "Auto from games" }, { value: "W", label: "Win" }, { value: "L", label: "Loss" },
     ] },
     { name: "notes", label: "Notes", type: "textarea" },
   ], base);
+
+  form.querySelector('[name="myDeck"]').addEventListener("change", (e) => {
+    deckName = e.target.value;
+    drawGames();
+  });
 
   bindSubmit(form, async () => {
     const v = values();
@@ -2003,7 +2041,7 @@ function matchForm(existing, template) {
       opponent: v.opponent.trim(),
       myDeck: v.myDeck || "",
       opponentDeck: v.opponentDeck.trim(),
-      games: clean,
+      games: clean.map((g) => ({ winner: g.winner, finish: g.finish, combo: g.combo || null })),
       result: clean.length ? "" : v.result,
       notes: v.notes.trim(),
     };
@@ -2111,7 +2149,7 @@ function liveScoring(template) {
 
         ${s.games.length ? `<div class="live-games">
           ${s.games.map((g, i) => `<button class="live-game live-game--${g.winner === "me" ? "me" : "opp"}" data-undo="${i}" title="Tap to remove">
-            ${g.winner === "me" ? "You" : "Opp"} · ${esc(finishLabel(g.finish))} +${finishPts(g.finish)}
+            ${g.winner === "me" ? "You" : "Opp"} · ${esc(finishLabel(g.finish))} +${finishPts(g.finish)}${g.combo?.blade ? " · " + esc(g.combo.blade) : ""}
           </button>`).join("")}
         </div>` : ""}
       </div>`;
@@ -2148,10 +2186,31 @@ function liveScoring(template) {
     sheet.querySelector("[data-cancel]").addEventListener("click", () => sheet.remove());
     sheet.querySelectorAll("[data-f]").forEach((b) =>
       b.addEventListener("click", () => {
-        s.games.push({ winner, finish: b.dataset.f });
+        const finish = b.dataset.f;
         sheet.remove();
-        board();
+        const comboOpts = deckComboOptions(s.myDeck);
+        if (comboOpts.length) beyPicker(winner, finish, comboOpts);
+        else { s.games.push({ winner, finish }); board(); }
       })
+    );
+  };
+
+  const beyPicker = (winner, finish, comboOpts) => {
+    const sheet = document.createElement("div");
+    sheet.className = "live-picker";
+    sheet.innerHTML = `
+      <div class="live-picker-card">
+        <h3>Which bey?</h3>
+        <div class="live-picker-grid">
+          ${comboOpts.map((o) => `<button class="btn btn-ghost" data-combo="${o.idx}">${esc(o.combo.blade || "Combo " + (o.idx + 1))}</button>`).join("")}
+          <button class="btn btn-ghost" data-skip>Skip</button>
+        </div>
+      </div>`;
+    root.append(sheet);
+    const push = (combo) => { s.games.push({ winner, finish, combo }); sheet.remove(); board(); };
+    sheet.querySelector("[data-skip]").addEventListener("click", () => push(null));
+    sheet.querySelectorAll("[data-combo]").forEach((b) =>
+      b.addEventListener("click", () => push({ ...comboOpts[Number(b.dataset.combo)].combo }))
     );
   };
 
@@ -2162,7 +2221,7 @@ function liveScoring(template) {
       opponent: s.opponent.trim(),
       myDeck: s.myDeck || "",
       opponentDeck: "",
-      games: s.games.map((g) => ({ winner: g.winner, finish: g.finish })),
+      games: s.games.map((g) => ({ winner: g.winner, finish: g.finish, combo: g.combo || null })),
       result: "",
       notes: "",
     };

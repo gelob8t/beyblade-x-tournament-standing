@@ -59,6 +59,35 @@ export function streaks(chronMatches) {
   return { current: Math.abs(run), type: run > 0 ? "win" : run < 0 ? "loss" : "", longestWin: longestW };
 }
 
+/**
+ * Per-bey (blade+ratchet+bit) win/loss, tallied per *game* — not per match,
+ * since a match can use a different bey for each game. Only games tagged
+ * with a `combo` (from the match/live-scoring form) count; untagged games
+ * are silently skipped, so this stays empty until someone opts in.
+ */
+export function beyRecord(matches, limit = 12) {
+  const g = {};
+  for (const m of matches || []) {
+    for (const game of m.games || []) {
+      const c = game.combo;
+      if (!c || !(c.blade || c.ratchet || c.bit)) continue;
+      const key = comboKey(c.blade, c.ratchet, c.bit);
+      if (!key) continue;
+      g[key] = g[key] || { blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "", w: 0, l: 0 };
+      if (game.winner === "me") g[key].w++; else g[key].l++;
+    }
+  }
+  return Object.values(g)
+    .map((r) => ({
+      ...r,
+      name: [r.blade, r.ratchet, r.bit].filter(Boolean).join(" / "),
+      total: r.w + r.l,
+      rate: r.w / (r.w + r.l),
+    }))
+    .sort((a, b) => b.total - a.total || b.rate - a.rate)
+    .slice(0, limit);
+}
+
 // ---- meta / combo tier list ------------------------------------------------
 
 export const TIERS = ["S", "A", "B", "C", "D"];

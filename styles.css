@@ -668,7 +668,9 @@ kbd { background: var(--bg-2); border: 1px solid var(--line-bright); border-radi
 .field--check input { width: auto; flex: none; accent-color: var(--blue); }
 .field--check span { font-size: .9rem; color: var(--text); text-transform: none; letter-spacing: 0; }
 .games-editor, .combo-editor { display: grid; gap: .5rem; padding: .8rem; background: var(--bg-2); border-left: 2px solid var(--blue); }
-.game-edit-row { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: .4rem; }
+.game-edit-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.game-edit-row select { flex: 1 1 130px; min-width: 0; }
+.game-edit-row [data-rm] { flex: none; margin-left: auto; }
 .combo-edit-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .4rem; }
 @media (max-width: 480px) { .combo-edit-row { grid-template-columns: 1fr; } }
 
@@ -911,7 +913,6 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
 }
 
 @media (max-width: 460px) {
-  .game-edit-row { grid-template-columns: 1fr 1fr auto; }
   .auth-card { padding: 1.5rem 1.25rem; }
   .brand-x { width: 48px; height: 48px; font-size: 1.6rem; }
   .brand h1 { font-size: 1.15rem; }

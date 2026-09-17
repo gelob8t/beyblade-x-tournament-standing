@@ -10,10 +10,10 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | Section | What goes in it |
 | --- | --- |
 | **Tournaments** | Name, date, location, format, final placement, W–L, notes. **Import from Challonge** — paste a tournament link, pick which participant was you, and it creates the tournament + your matches (result + score) in one go. |
-| **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes |
+| **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes. Once a deck has combos, each game can also be tagged with **which bey played it** — decks often mix beys game to game, so this is tracked per game, not per match. |
 | **Collection** | Owned Blades, Ratchets and Bits. **Browse catalog** opens a searchable, filterable picker (by type / role / system) with a generated icon per part — tick several and add them at once. Name fields also autocomplete from the catalog. |
 | **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
-| **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement |
+| **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement, top-performing bey |
 | **Share stats** | Generates a themed stats card (record, best finish, achievements, top deck) as a PNG. **Share…** opens the OS share sheet where supported — any app, any social network, Instagram/TikTok included if installed. Always available: download, copy to clipboard, one-tap X/Facebook/WhatsApp/Reddit links, and an Instagram/TikTok shortcut that downloads the image ready to post from your gallery. |
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON **export** of all your data, and **import / restore** from that file (adds only what's not already there) |
 | **Team** | Create or join a team by invite code; shared roster + win-rate leaderboard, team profile, 3v3 team battles, team tournaments |
@@ -169,7 +169,8 @@ users/{uid}/profile/main      { bladerName, region, homeStore, mainBey, bio, tea
                                           // resized in the browser, no Firebase Storage needed
 users/{uid}/tournaments/{id}   { name, date, location, format, placement, wins, losses, notes }
 users/{uid}/matches/{id}       { date, tournamentId, opponent, myDeck, opponentDeck,
-                                 games: [{ winner: "me"|"opp", finish: "Spin"|"Over"|"Burst"|"Xtreme" }],
+                                 games: [{ winner: "me"|"opp", finish: "Spin"|"Over"|"Burst"|"Xtreme",
+                                            combo: { blade, ratchet, bit } | null }],
                                  result, notes }
 users/{uid}/beys/{id}          { type: "Blade"|"Ratchet"|"Bit", name, notes }
 users/{uid}/decks/{id}         { name, combos: [{ blade, ratchet, bit }], notes }

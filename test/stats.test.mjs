@@ -3,10 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   finishPts, matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
-  comboKey, consensus,
+  comboKey, consensus, beyRecord,
 } from "../js/stats.js";
 
 const G = (winner, finish) => ({ winner, finish });
+const GC = (winner, finish, combo) => ({ winner, finish, combo });
 
 test("finishPts", () => {
   assert.equal(finishPts("Spin"), 1);
@@ -134,4 +135,37 @@ test("consensus: maps average score to a letter", () => {
   assert.equal(consensus({ S: 1, D: 1 }, 2).letter, "B"); // avg 3.0
   assert.equal(consensus({ D: 5 }, 5).letter, "D");
   assert.equal(consensus({ S: 1, A: 1, B: 1 }, 3).count, 3);
+});
+
+test("beyRecord: tallies per game (not per match), keyed by blade+ratchet+bit", () => {
+  const dranBuster = { blade: "Dran Buster", ratchet: "3-60", bit: "Flat" };
+  const wizardRod = { blade: "Wizard Rod", ratchet: "5-70", bit: "Point" };
+  const matches = [
+    { games: [GC("me", "Xtreme", dranBuster), GC("opp", "Spin", dranBuster)] }, // 1-1
+    { games: [GC("me", "Burst", dranBuster), GC("me", "Burst", wizardRod)] },    // dranBuster 2-1, wizardRod 1-0
+    { games: [G("me", "Spin")] }, // no combo tagged — ignored entirely
+  ];
+  const rows = beyRecord(matches);
+  const dran = rows.find((r) => r.name === "Dran Buster / 3-60 / Flat");
+  const wiz = rows.find((r) => r.name === "Wizard Rod / 5-70 / Point");
+  assert.deepEqual({ w: dran.w, l: dran.l, total: dran.total }, { w: 2, l: 1, total: 3 });
+  assert.deepEqual({ w: wiz.w, l: wiz.l, total: wiz.total }, { w: 1, l: 0, total: 1 });
+  // sorted by games played desc
+  assert.equal(rows[0].name, "Dran Buster / 3-60 / Flat");
+});
+
+test("beyRecord: partial combos still key correctly, empty/undefined games are safe", () => {
+  const rows = beyRecord([
+    { games: [GC("me", "Spin", { blade: "Dran Sword", ratchet: "", bit: "" })] },
+    { games: [] },
+    {},
+  ]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].name, "Dran Sword");
+  assert.equal(rows[0].w, 1);
+});
+
+test("beyRecord: no matches / no tagged games -> empty", () => {
+  assert.deepEqual(beyRecord([]), []);
+  assert.deepEqual(beyRecord([{ games: [G("me", "Spin")] }]), []);
 });
