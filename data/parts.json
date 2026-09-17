@@ -1,6 +1,6 @@
 {
   "updated": "2026-09-17",
-  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
   "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.png. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
   "imageBase": "./assets/parts/",
   "imageExt": ".png",
@@ -55,6 +55,8 @@
     { "name": "Crimson Garuda", "system": "CX", "role": "Attack", "spin": "Right", "note": "CX attacker; role best-effort." },
     { "name": "Glory Valkyrie", "system": "CX", "role": "Attack", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. System/role best-effort, unconfirmed." },
     { "name": "Sol Eclipse", "system": "CX", "role": "Balance", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. System/role best-effort, unconfirmed." },
+    { "name": "Dran Brave S", "system": "CX", "role": "Attack", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. System/role best-effort, unconfirmed." },
+    { "name": "Perseus Dark B", "system": "CX", "role": "Balance", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. System/role best-effort, unconfirmed." },
     { "name": "Xeno Xcalibur", "system": "CX", "role": "", "spin": "Right", "note": "CX blade; role unconfirmed." },
     { "name": "Ghost Circle", "system": "CX", "role": "", "spin": "Right", "note": "Burst-legacy CX crossover; role unconfirmed." },
     { "name": "Dranzer Spiral", "system": "CX", "role": "Attack", "spin": "Right", "note": "Burst-legacy CX crossover; fire-attack motif." },
