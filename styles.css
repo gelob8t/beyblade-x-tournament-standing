@@ -580,6 +580,25 @@ textarea { resize: vertical; }
   object-fit: contain; background: var(--bg-2); border-radius: 3px;
   transition: opacity .2s ease;
 }
+@media (hover: hover) and (pointer: fine) {
+  .part-vis-img { cursor: zoom-in; }
+}
+
+/* ---------- floating part-photo preview (hover) ---------- */
+.img-preview { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .img-preview:not([hidden]) {
+    display: block;
+    position: fixed; z-index: 200; pointer-events: none;
+    width: 240px; height: 240px;
+    background-color: var(--panel); background-repeat: no-repeat;
+    background-position: center; background-size: contain;
+    border: 1px solid var(--line-bright);
+    border-top: 3px solid transparent; border-image: var(--split) 1;
+    box-shadow: var(--shadow);
+    clip-path: polygon(0 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%);
+  }
+}
 .catalog-picker { display: grid; gap: .9rem; }
 .catalog-controls { display: grid; gap: .55rem; position: sticky; top: 0; background: var(--panel); padding-bottom: .35rem; z-index: 1; }
 .catalog-controls input[type="search"] { width: 100%; }

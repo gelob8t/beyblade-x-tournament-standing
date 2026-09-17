@@ -634,6 +634,43 @@ function initShell() {
   );
   initProfileMenu();
   initNet();
+  initImagePreview();
+}
+
+// Hover a part photo anywhere in the app to float a larger preview near the
+// cursor. Delegated on document so it works for every current/future
+// .part-vis-img without per-instance wiring; mouse-only (see CSS) since
+// hover isn't a touch pattern.
+function initImagePreview() {
+  const preview = document.createElement("div");
+  preview.className = "img-preview";
+  preview.hidden = true;
+  document.body.append(preview);
+
+  const PAD = 16, SIZE = 240;
+  const place = (x, y) => {
+    let left = x + PAD, top = y + PAD;
+    if (left + SIZE > innerWidth - PAD) left = x - SIZE - PAD;
+    if (top + SIZE > innerHeight - PAD) top = y - SIZE - PAD;
+    preview.style.left = Math.max(PAD, left) + "px";
+    preview.style.top = Math.max(PAD, top) + "px";
+  };
+  const hide = () => { preview.hidden = true; };
+
+  document.addEventListener("mouseover", (e) => {
+    const img = e.target.closest(".part-vis-img");
+    if (!img || !img.complete || !img.naturalWidth) return;
+    preview.style.backgroundImage = `url("${img.currentSrc || img.src}")`;
+    place(e.clientX, e.clientY);
+    preview.hidden = false;
+  });
+  document.addEventListener("mousemove", (e) => {
+    if (!preview.hidden && e.target.closest(".part-vis-img")) place(e.clientX, e.clientY);
+  });
+  document.addEventListener("mouseout", (e) => {
+    if (e.target.closest(".part-vis-img") && !e.relatedTarget?.closest(".part-vis-img")) hide();
+  });
+  document.addEventListener("scroll", hide, true);
 }
 
 function initNet() {
