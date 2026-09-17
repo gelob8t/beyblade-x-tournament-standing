@@ -2404,7 +2404,7 @@ function partIcon(part, size = 40) {
     // icon underneath, photo on top; if the photo 404s it removes itself
     return `<span class="part-vis" style="width:${size}px;height:${size}px">` +
       `<span class="part-vis-svg">${svg}</span>` +
-      `<img class="part-vis-img" src="${esc(part.image)}" alt="" loading="lazy" ` +
+      `<img class="part-vis-img" src="${esc(part.image)}" alt="" loading="lazy" decoding="async" ` +
       `style="opacity:0" onload="this.style.opacity=1" onerror="this.remove()" />` +
       `</span>`;
   }

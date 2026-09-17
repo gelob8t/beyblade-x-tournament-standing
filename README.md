@@ -68,14 +68,16 @@ ratings on the Meta tab still work either way.
 ### 2c. (Optional) Part images
 
 The **Collection → Browse catalog** picker shows a generated icon per part. To
-show real photos instead:
+show real photos instead — already set up with the ~100 images in
+[`assets/parts/`](assets/parts/), see that folder's README for the format/size
+guidance that keeps the catalog loading fast:
 
 1. Run `npm run parts:slugs` to list every part and its expected file name
-   (e.g. `Dran Sword → dran-sword.png`).
+   (e.g. `Dran Sword → dran-sword.webp`).
 2. Put the images somewhere web-accessible — a folder in this repo like
    `assets/parts/`, or an external CDN/bucket URL.
 3. In [`data/parts.json`](data/parts.json) set `"imageBase"` to that folder
-   (e.g. `"./assets/parts/"`) and `"imageExt"` if it isn't `.png`.
+   (e.g. `"./assets/parts/"`) and `"imageExt"` if it isn't `.webp`.
 
 The app builds each URL as `imageBase + slug + imageExt`. For a one-off, put an
 explicit `"image": "https://…"` on a single part instead (that wins). Any URL
