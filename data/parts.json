@@ -1,6 +1,6 @@
 {
   "updated": "2026-09-17",
-  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) for completeness. `system` (BX/UX/CX), `role` and `spin` are still best-effort — that site lists names/photos only, not stats — so a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge). `system` (BX/UX/CX), `role` and `spin` are still best-effort — that site lists names/photos only, not stats — so a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
   "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.png. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
   "imageBase": "./assets/parts/",
   "imageExt": ".png",
@@ -94,6 +94,7 @@
     { "name": "Gear Flat", "role": "Attack", "note": "Flat with a gear-driven kick; disruptive attack movement." },
     { "name": "Cyclone", "role": "Attack", "note": "Rubber, moves in wide circles; good sustained pressure." },
     { "name": "Glide", "role": "Attack", "note": "Rubber attack tip, sustained curving path." },
+    { "name": "Kick", "role": "Attack", "note": "Rubber tip that hops; disruptive movement." },
     { "name": "Ball", "role": "Stamina", "note": "The stamina/defense benchmark; huge staying power." },
     { "name": "Free Ball", "role": "Stamina", "note": "Free-spinning Ball; excellent recovery." },
     { "name": "Disc Ball", "role": "Stamina", "note": "Wide-disc Ball variant; extra stability and stamina." },
@@ -109,6 +110,7 @@
     { "name": "Under Needle", "role": "Stamina", "note": "Lower Needle variant." },
     { "name": "Metal Needle", "role": "Stamina", "note": "Weighted Needle; better stability." },
     { "name": "Gear Needle", "role": "Stamina", "note": "Needle with a gear-driven kick; stamina with disruption." },
+    { "name": "Vortex", "role": "Stamina", "note": "Rubber stamina tip." },
     { "name": "Level", "role": "Balance", "note": "Wide low bearing; balance/stamina." },
     { "name": "Elevate", "role": "Balance", "note": "Height-changing tip." },
     { "name": "Bound Spike", "role": "Balance", "note": "Spring-loaded tip; disrupts attackers and self-KOs less." },
@@ -116,6 +118,7 @@
     { "name": "Spike", "role": "Defense", "note": "Plastic sharp tip; stable, budget defense." },
     { "name": "Gear Ball", "role": "Defense", "note": "Gear-driven Ball; extra burst and self-recovery." },
     { "name": "Quake", "role": "Defense", "note": "Aggressive defensive tip that counter-hits." },
+    { "name": "Wedge", "role": "Defense", "note": "Angled low guard." },
     { "name": "Hexa", "role": "Defense", "note": "Six-sided low tip; stable against attack." }
   ]
 }
