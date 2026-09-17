@@ -693,6 +693,20 @@ kbd { background: var(--bg-2); border: 1px solid var(--line-bright); border-radi
 .combo-edit-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .4rem; }
 @media (max-width: 480px) { .combo-edit-row { grid-template-columns: 1fr; } }
 
+/* ---------- custom autocomplete (replaces native <datalist>) ---------- */
+.autocomplete-list {
+  position: fixed; z-index: 150; max-height: 240px; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--line-bright);
+  box-shadow: var(--shadow);
+}
+.autocomplete-item {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--line);
+  color: var(--text); font: inherit; padding: .5em .8em; cursor: pointer;
+}
+.autocomplete-item:last-child { border-bottom: none; }
+.autocomplete-item:hover, .autocomplete-item.is-active { background: var(--panel-2); color: var(--accent); }
+
 /* ---------- team ---------- */
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; margin-bottom: .9rem; }
 .team-banner {

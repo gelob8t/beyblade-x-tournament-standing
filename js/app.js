@@ -2343,13 +2343,9 @@ function beyForm(existing) {
   ], existing || {});
 
   // autocomplete the name from the canonical parts list for the chosen type
-  form.append(partDatalists());
   const nameInput = form.querySelector('[name="name"]');
   const typeSel = form.querySelector('[name="type"]');
-  const LIST_ID = { Blade: "blades-list", Ratchet: "ratchets-list", Bit: "bits-list" };
-  const syncList = () => nameInput.setAttribute("list", LIST_ID[typeSel.value] || "");
-  syncList();
-  typeSel.addEventListener("change", syncList);
+  attachAutocomplete(nameInput, () => mergedPartNames(typeSel.value));
 
   bindSubmit(form, async () => {
     const v = values();
@@ -2622,15 +2618,16 @@ function deckForm(existing, seedCombo) {
       const row = document.createElement("div");
       row.className = "combo-edit-row";
       row.innerHTML = `
-        <input placeholder="Blade" value="${esc(c.blade || "")}" data-k="blade" list="blades-list" />
-        <input placeholder="Ratchet" value="${esc(c.ratchet || "")}" data-k="ratchet" list="ratchets-list" />
-        <input placeholder="Bit" value="${esc(c.bit || "")}" data-k="bit" list="bits-list" />`;
-      row.querySelectorAll("input").forEach((inp) =>
-        inp.addEventListener("input", (e) => (combos[i][e.target.dataset.k] = e.target.value.trim()))
-      );
+        <input placeholder="Blade" value="${esc(c.blade || "")}" data-k="blade" />
+        <input placeholder="Ratchet" value="${esc(c.ratchet || "")}" data-k="ratchet" />
+        <input placeholder="Bit" value="${esc(c.bit || "")}" data-k="bit" />`;
+      const TYPE_FOR_KEY = { blade: "Blade", ratchet: "Ratchet", bit: "Bit" };
+      row.querySelectorAll("input").forEach((inp) => {
+        inp.addEventListener("input", (e) => (combos[i][e.target.dataset.k] = e.target.value.trim()));
+        attachAutocomplete(inp, () => mergedPartNames(TYPE_FOR_KEY[inp.dataset.k]));
+      });
       box.append(row);
     });
-    box.append(partDatalists());
     return box;
   };
 
@@ -2652,31 +2649,96 @@ function deckForm(existing, seedCombo) {
   modal.open(existing ? "Edit deck" : "Add deck", form);
 }
 
-function partDatalists() {
-  const frag = document.createDocumentFragment();
+/** Known names for a part type: your own collection first, then the canonical meta list — deduped, case-insensitive. */
+function mergedPartNames(type) {
+  const mine = state.beys.filter((b) => b.type === type).map((b) => b.name);
   const mp = state.metaParts || {};
-  const make = (id, type) => {
-    const dl = document.createElement("datalist");
-    dl.id = id;
-    // your own collection first, then the canonical meta list — deduped, case-insensitive
-    const mine = state.beys.filter((b) => b.type === type).map((b) => b.name);
-    const seen = new Set();
-    for (const raw of [...mine, ...(mp[type] || [])]) {
-      const n = String(raw || "").trim();
-      if (!n) continue;
-      const k = n.toLowerCase();
-      if (seen.has(k)) continue;
-      seen.add(k);
-      const o = document.createElement("option");
-      o.value = n;
-      dl.append(o);
-    }
-    frag.append(dl);
+  const seen = new Set();
+  const out = [];
+  for (const raw of [...mine, ...(mp[type] || [])]) {
+    const n = String(raw || "").trim();
+    if (!n) continue;
+    const k = n.toLowerCase();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(n);
+  }
+  return out;
+}
+
+/**
+ * A small filterable suggestion dropdown attached to a text input — a
+ * from-scratch replacement for the native <datalist>, whose popup is
+ * unreliable across browsers (notably Safari/mobile: no popup at all in
+ * many versions even with options present). `getOptions()` is called fresh
+ * every time the list opens, so it always reflects current state.
+ */
+function attachAutocomplete(input, getOptions) {
+  let list = null;
+  let items = [];
+  let activeIndex = -1;
+  let suppress = false;
+
+  const close = () => {
+    if (list) { list.remove(); list = null; }
+    items = [];
+    activeIndex = -1;
   };
-  make("blades-list", "Blade");
-  make("ratchets-list", "Ratchet");
-  make("bits-list", "Bit");
-  return frag;
+
+  const place = () => {
+    if (!list) return;
+    const r = input.getBoundingClientRect();
+    list.style.left = r.left + "px";
+    list.style.top = (r.bottom + 4) + "px";
+    list.style.width = r.width + "px";
+  };
+
+  const highlight = () => {
+    if (!list) return;
+    [...list.children].forEach((el, i) => el.classList.toggle("is-active", i === activeIndex));
+    if (activeIndex >= 0) list.children[activeIndex]?.scrollIntoView({ block: "nearest" });
+  };
+
+  const select = (value) => {
+    suppress = true;
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    suppress = false;
+    close();
+  };
+
+  const open = () => {
+    if (suppress) return;
+    const all = getOptions() || [];
+    const q = input.value.trim().toLowerCase();
+    items = (q ? all.filter((o) => o.toLowerCase().includes(q)) : all).slice(0, 30);
+    if (!items.length) { close(); return; }
+    if (!list) {
+      list = document.createElement("div");
+      list.className = "autocomplete-list";
+      document.body.append(list);
+    }
+    activeIndex = -1;
+    list.innerHTML = items.map((v) => `<button type="button" class="autocomplete-item">${esc(v)}</button>`).join("");
+    [...list.children].forEach((el, i) =>
+      el.addEventListener("pointerdown", (e) => { e.preventDefault(); select(items[i]); })
+    );
+    place();
+  };
+
+  input.addEventListener("focus", open);
+  input.addEventListener("input", open);
+  input.addEventListener("keydown", (e) => {
+    if (!list) { if (e.key === "ArrowDown") open(); return; }
+    if (e.key === "ArrowDown") { e.preventDefault(); activeIndex = Math.min(activeIndex + 1, items.length - 1); highlight(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); activeIndex = Math.max(activeIndex - 1, 0); highlight(); }
+    else if (e.key === "Enter") { if (activeIndex >= 0) { e.preventDefault(); select(items[activeIndex]); } }
+    else if (e.key === "Escape") close();
+  });
+  input.addEventListener("blur", () => setTimeout(close, 150));
+  addEventListener("resize", place);
+  document.addEventListener("scroll", place, true);
 }
 
 // ---------------------------------------------------------------------------
@@ -2885,11 +2947,9 @@ function addComboForm() {
     { name: "bit", label: "Bit", required: true, placeholder: "e.g. Flat" },
     { name: "role", label: "Role", type: "select", options: ["Attack", "Stamina", "Defense", "Balance"].map((v) => ({ value: v, label: v })) },
   ], {});
-  // datalists from the user's collection
-  form.append(partDatalists());
-  form.querySelector('[name="blade"]').setAttribute("list", "blades-list");
-  form.querySelector('[name="ratchet"]').setAttribute("list", "ratchets-list");
-  form.querySelector('[name="bit"]').setAttribute("list", "bits-list");
+  attachAutocomplete(form.querySelector('[name="blade"]'), () => mergedPartNames("Blade"));
+  attachAutocomplete(form.querySelector('[name="ratchet"]'), () => mergedPartNames("Ratchet"));
+  attachAutocomplete(form.querySelector('[name="bit"]'), () => mergedPartNames("Bit"));
 
   bindSubmit(form, async () => {
     const v = values();
