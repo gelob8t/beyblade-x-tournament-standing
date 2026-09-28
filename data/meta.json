@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-21",
+  "updated": "2026-09-28",
   "note": "Starting snapshot compiled from competitive results and community consensus through early 2026. The Beyblade X meta shifts fast — treat this as a baseline and use the community ratings below to keep it current.",
   "roles": [
     "Attack",
@@ -392,6 +392,6 @@
       "note": "Anti-attack, disrupts the aggressor's path."
     }
   ],
-  "refreshedAt": "2026-09-21T12:22:31.311Z",
+  "refreshedAt": "2026-09-28T13:19:14.529Z",
   "communityVotes": 2
 }
