@@ -667,7 +667,7 @@ textarea { resize: vertical; }
   box-shadow: var(--shadow);
   clip-path: polygon(0 0,100% 0,100% calc(100% - 16px),calc(100% - 16px) 100%,0 100%);
 }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.2rem; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--panel); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.2rem; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; background: var(--panel); }
 .modal-head h2 { margin: 0; }
 .modal-head h2::before { display: none; }
 .modal-close { background: none; border: none; color: var(--muted); font-size: 1.6rem; line-height: 1; cursor: pointer; }
