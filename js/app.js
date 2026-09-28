@@ -556,22 +556,55 @@ function initAuthUi() {
     }
   });
 
-  $("#auth-reset").addEventListener("click", async () => {
-    const email = $("#auth-email").value.trim();
-    if (!email) return toast("Enter your email first, then click reset.", "warn");
-    try {
-      await sendPasswordResetEmail(auth, email);
-      toast("Password reset email sent.");
-    } catch (err) {
-      toast(friendlyAuthError(err), "err");
-    }
-  });
+  $("#auth-reset").addEventListener("click", resetPasswordForm);
 
   // landing <-> auth navigation
   $$("[data-auth]").forEach((b) =>
     b.addEventListener("click", () => showAuth(b.dataset.auth))
   );
   $("#auth-back").addEventListener("click", showLanding);
+}
+
+// Forgot password: ask for the email in a dialog (prefilled from the sign-in
+// form) and confirm inside it, so the result can't be missed like a toast.
+function resetPasswordForm() {
+  if (!isConfigured) return toast("Firebase is not configured yet.", "err");
+  const { form, values } = buildForm([
+    { name: "email", label: "Email", type: "email", required: true, placeholder: "you@example.com" },
+  ], { email: $("#auth-email").value.trim() });
+  const hint = document.createElement("p");
+  hint.className = "muted small";
+  hint.textContent = "We'll email you a link to set a new password.";
+  form.prepend(hint);
+  const err = document.createElement("p");
+  err.className = "form-error";
+  err.setAttribute("role", "alert");
+  err.hidden = true;
+  form.querySelector(".form-actions").before(err);
+  form.querySelector(".form-actions .btn-primary").textContent = "Send reset link";
+
+  bindSubmit(form, async () => {
+    const email = values().email.trim();
+    err.hidden = true;
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (e) {
+      err.textContent = friendlyAuthError(e);
+      err.hidden = false;
+      return;
+    }
+    $("#auth-email").value = email;
+    const done = document.createElement("div");
+    done.className = "entry-form";
+    done.innerHTML = `
+      <p>If an account exists for <strong>${esc(email)}</strong>, a password reset link is on its way.</p>
+      <p class="muted small">Don't see it within a few minutes? Check your spam or junk folder.</p>
+      <div class="form-actions"><button type="button" class="btn btn-primary" data-close>Back to sign in</button></div>`;
+    done.querySelector("[data-close]").addEventListener("click", modal.close);
+    modal.open("Check your email", done);
+  });
+  modal.open("Reset password", form);
+  setTimeout(() => form.querySelector("input").focus(), 50);
 }
 
 function showLanding() {
@@ -1285,7 +1318,7 @@ function renderStats(main) {
     </div>
 
     ${recordTable("Your decks", myDeck, "Deck")}
-    ${beyRows.length ? recordTable("Bey performance", beyRows, "Bey") : `<section class="panel">
+    ${beyRows.length ? recordTable("Bey performance", beyRows, "Bey", (r) => comboKey(r.blade, r.ratchet, r.bit)) : `<section class="panel">
       <h2>Bey performance</h2>
       <p class="muted">Tag which bey played each game — in Log match or Live scoring, once a deck has combos — to see each bey's own record here.</p>
     </section>`}
@@ -1295,6 +1328,103 @@ function renderStats(main) {
     ${achvPanel(false)}
   `;
   $("#share-stats").addEventListener("click", () => shareStatsCard());
+  $$("[data-bey]", main).forEach((el) => {
+    const go = () => beyStatsModal(el.dataset.bey);
+    el.addEventListener("click", go);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
+}
+
+// Full breakdown for one Blade/Ratchet/Bit combo, from every game tagged with it.
+function beyStatsModal(key) {
+  const games = []; // { m, g }
+  for (const m of state.matches) for (const g of m.games || []) {
+    const c = g.combo;
+    if (c && comboKey(c.blade, c.ratchet, c.bit) === key) games.push({ m, g });
+  }
+  if (!games.length) return;
+  const c = games[0].g.combo;
+  const name = [c.blade, c.ratchet, c.bit].filter(Boolean).join(" / ");
+
+  let w = 0, l = 0, ptsFor = 0, ptsAgainst = 0;
+  const scored = {}, conceded = {};
+  const byMatch = new Map();
+  const vsOpp = {}, vsBey = {};
+  const tally = (bucket, k, won) => {
+    if (!k) return;
+    bucket[k] = bucket[k] || { name: k, w: 0, l: 0 };
+    won ? bucket[k].w++ : bucket[k].l++;
+  };
+  for (const { m, g } of games) {
+    const won = g.winner === "me";
+    if (won) { w++; ptsFor += finishPts(g.finish); scored[g.finish] = (scored[g.finish] || 0) + 1; }
+    else { l++; ptsAgainst += finishPts(g.finish); conceded[g.finish] = (conceded[g.finish] || 0) + 1; }
+    if (!byMatch.has(m)) byMatch.set(m, []);
+    byMatch.get(m).push(g);
+    tally(vsOpp, (m.opponent || "").trim() || "Unknown", won);
+    tally(vsBey, (m.opponentDeck || "").trim(), won);
+  }
+  const toRows = (bucket) => Object.values(bucket)
+    .map((r) => ({ ...r, rate: r.w / (r.w + r.l) }))
+    .sort((a, b) => (b.w + b.l) - (a.w + a.l) || b.rate - a.rate);
+  const matches = [...byMatch.keys()].sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const matchWins = matches.filter((m) => matchResult(m) === "W").length;
+  const rate = Math.round((w / (w + l)) * 100);
+  const lastDate = matches.find((m) => m.date)?.date;
+
+  const parts = [["Blade", c.blade], ["Ratchet", c.ratchet], ["Bit", c.bit]].filter(([, n]) => n);
+  const miniTable = (title, rows, col) => rows.length ? `
+    <h3>${esc(title)}</h3>
+    <div class="table-wrap"><table class="data-table">
+      <thead><tr><th>${esc(col)}</th><th>Games</th><th>Win rate</th></tr></thead>
+      <tbody>${rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${r.w}–${r.l}</td>
+        <td><div class="mini-bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div> ${Math.round(r.rate * 100)}%</td></tr>`).join("")}</tbody>
+    </table></div>` : "";
+
+  const box = document.createElement("div");
+  box.className = "bey-detail";
+  box.innerHTML = `
+    <div class="bey-detail-parts">
+      ${parts.map(([type, n]) => `<div class="bey-detail-part">
+        ${partIcon(catalogPart(type, n) || { type, name: n }, 48)}
+        <span class="muted small">${type}</span>
+        <strong>${esc(n)}</strong>
+      </div>`).join("")}
+    </div>
+
+    <div class="stat-grid">
+      ${statCard("Game win rate", rate + "%", `${w}W – ${l}L games`)}
+      ${statCard("Matches", String(matches.length), `${matchWins}W – ${matches.length - matchWins}L when used`)}
+      ${statCard("Points", `${ptsFor}–${ptsAgainst}`, "scored – conceded")}
+      ${statCard("Last used", lastDate ? fmtDate(lastDate) : "—", `${games.length} game${games.length === 1 ? "" : "s"} tagged`)}
+    </div>
+
+    <h3>Finishes it scored</h3>
+    ${finishBars(scored, w)}
+    <h3>Finishes scored on it</h3>
+    ${finishBars(conceded, l)}
+
+    ${miniTable("Vs. opponent bey / deck", toRows(vsBey), "Their bey")}
+    ${miniTable("Vs. opponent", toRows(vsOpp), "Opponent")}
+
+    <h3>Matches</h3>
+    <ul class="bey-detail-matches">
+      ${matches.slice(0, 15).map((m) => {
+        const res = matchResult(m);
+        const t = state.tournaments.find((x) => x.id === m.tournamentId);
+        return `<li>
+          <span class="result-badge result-badge--${res === "W" ? "w" : res === "L" ? "l" : "x"}">${res}</span>
+          <div>
+            <div>vs ${esc(m.opponent || "Unknown")}${m.opponentDeck ? ` <span class="muted">· ${esc(m.opponentDeck)}</span>` : ""}</div>
+            <div class="muted small">${fmtDate(m.date)}${t ? " · " + esc(t.name) : ""}</div>
+            <div class="game-line">${byMatch.get(m).map((g) => `<span class="game-tag game-tag--${g.winner === "me" ? "w" : "l"}">${g.winner === "me" ? "W" : "L"} · ${esc(finishLabel(g.finish))}</span>`).join("")}</div>
+          </div>
+        </li>`;
+      }).join("")}
+    </ul>
+    ${matches.length > 15 ? `<p class="muted small">Showing the 15 most recent of ${matches.length} matches.</p>` : ""}
+  `;
+  modal.open(name, box);
 }
 
 function monthLabel(k) {
@@ -1303,14 +1433,16 @@ function monthLabel(k) {
   return isNaN(d) ? k : d.toLocaleDateString(undefined, { month: "short", year: "2-digit" });
 }
 
-function recordTable(title, rows, col) {
+// `rowKey` (optional) makes each row clickable, tagged with data-bey="<key>".
+function recordTable(title, rows, col, rowKey) {
   if (!rows.length) return "";
   return `<section class="panel">
     <h2>${esc(title)}</h2>
+    ${rowKey ? `<p class="muted small">Tap a bey for its full stats.</p>` : ""}
     <div class="table-wrap"><table class="data-table">
       <thead><tr><th>${esc(col)}</th><th>Record</th><th>Win rate</th></tr></thead>
-      <tbody>${rows.map((r) => `<tr>
-        <td>${esc(r.name)}</td>
+      <tbody>${rows.map((r) => `<tr${rowKey ? ` class="is-clickable" data-bey="${esc(rowKey(r))}" role="button" tabindex="0"` : ""}>
+        <td>${esc(r.name)}${rowKey ? ` <span class="row-chevron" aria-hidden="true">›</span>` : ""}</td>
         <td>${r.w}–${r.l}</td>
         <td><div class="mini-bar"><span style="width:${Math.round(r.rate * 100)}%"></span></div> ${Math.round(r.rate * 100)}%</td>
       </tr>`).join("")}</tbody>

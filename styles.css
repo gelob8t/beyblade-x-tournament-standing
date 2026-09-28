@@ -503,6 +503,19 @@ textarea { resize: vertical; }
 .data-table th { text-align: left; font-family: var(--font-display); color: var(--muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; font-size: .76rem; padding: .5em .6em; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .data-table td { padding: .55em .6em; border-bottom: 1px solid var(--bg-2); white-space: nowrap; }
 .data-table td .mini-bar { margin-right: .4em; }
+.data-table tr.is-clickable { transition: background .12s ease; }
+.data-table tr.is-clickable:hover, .data-table tr.is-clickable:focus-visible { background: var(--panel-2); outline: none; }
+.row-chevron { color: var(--muted); margin-left: .3em; }
+
+/* bey detail modal */
+.bey-detail { display: grid; gap: .8rem; }
+.bey-detail h3 { margin: .6rem 0 0; font-size: .95rem; }
+.bey-detail .stat-grid { margin-bottom: 0; grid-template-columns: 1fr 1fr; }
+.bey-detail-parts { display: flex; justify-content: center; gap: 1.2rem; flex-wrap: wrap; }
+.bey-detail-part { display: grid; justify-items: center; gap: .15rem; text-align: center; min-width: 84px; }
+.bey-detail-matches { list-style: none; margin: 0; padding: 0; display: grid; gap: .6rem; }
+.bey-detail-matches li { display: flex; gap: .6rem; align-items: flex-start; padding-bottom: .6rem; border-bottom: 1px solid var(--bg-2); }
+.bey-detail-matches li:last-child { border-bottom: none; padding-bottom: 0; }
 
 /* ---------- recent form pills ---------- */
 .form-pills { display: flex; gap: .35rem; flex-wrap: wrap; }
