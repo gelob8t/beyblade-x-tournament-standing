@@ -1,6 +1,18 @@
 {
   "updated": "2026-09-28",
-  "note": "Starting snapshot compiled from competitive results and community consensus through early 2026. The Beyblade X meta shifts fast — treat this as a baseline and use the community ratings below to keep it current.",
+  "note": "Combo tiers come from community votes, refreshed weekly. Blade, Ratchet and Bit rankings are BBX Weekly's top 15 (or fewer), based on podium finishes at official WBO events.",
+  "partsSource": {
+    "name": "BBX Weekly",
+    "url": "https://www.bbxweekly.com/",
+    "metric": "Podium Power Score",
+    "basis": "podium finishes at official WBO events",
+    "week": "2026-W18",
+    "start": "2026-04-24",
+    "end": "2026-05-07",
+    "events": 109,
+    "partsAnalyzed": 3140,
+    "capturedAt": "2026-09-29"
+  },
   "roles": [
     "Attack",
     "Stamina",
@@ -9,275 +21,260 @@
   ],
   "blades": [
     {
-      "name": "Dran Buster",
-      "line": "BX",
-      "role": "Attack",
-      "tier": "S",
-      "note": "Premier upper-attack blade; heavy contact, high burst potential."
+      "rank": 1,
+      "name": "Shark Scale",
+      "score": 90,
+      "trend": "same"
     },
     {
-      "name": "Cobalt Drake",
-      "line": "BX",
-      "role": "Attack",
-      "tier": "S",
-      "note": "Aggressive smash attacker, strong bank-shot recovery."
-    },
-    {
-      "name": "Aero Pegasus",
-      "line": "CX",
-      "role": "Attack",
-      "tier": "S",
-      "note": "CX-era attack standout with assist-blade options."
-    },
-    {
-      "name": "Shark Edge",
-      "line": "BX",
-      "role": "Attack",
-      "tier": "A",
-      "note": "Classic attack pick, still consistent."
-    },
-    {
-      "name": "Leon Claw",
-      "line": "BX",
-      "role": "Attack",
-      "tier": "A",
-      "note": "Wide contact points, good burst attack."
-    },
-    {
-      "name": "Dran Sword",
-      "line": "BX",
-      "role": "Attack",
-      "tier": "B",
-      "note": "Entry attacker, outclassed but reliable."
-    },
-    {
+      "rank": 2,
       "name": "Wizard Rod",
-      "line": "UX",
-      "role": "Stamina",
-      "tier": "S",
-      "note": "Top stamina base; excellent life-after-death and recovery."
+      "score": 84,
+      "trend": "same"
     },
     {
-      "name": "Phoenix Wing",
-      "line": "BX",
-      "role": "Stamina",
-      "tier": "S",
-      "note": "Outspin monster with strong burst resistance."
+      "rank": 3,
+      "name": "Aero Pegasus",
+      "score": 66,
+      "trend": "same"
     },
     {
-      "name": "Hells Chain",
-      "line": "BX",
-      "role": "Stamina",
-      "tier": "A",
-      "note": "Heavy stamina/defense hybrid."
+      "rank": 4,
+      "name": "Meteor Dragoon",
+      "score": 57,
+      "trend": "up"
     },
     {
-      "name": "Weiss Tiger",
-      "line": "BX",
-      "role": "Stamina",
-      "tier": "A",
-      "note": "Low-profile stamina with disruption."
+      "rank": 5,
+      "name": "Wyvern Hover",
+      "score": 51,
+      "trend": "up"
     },
     {
-      "name": "Silver Wolf",
-      "line": "BX",
-      "role": "Stamina",
-      "tier": "B",
-      "note": "Solid budget stamina blade."
+      "rank": 6,
+      "name": "Rage",
+      "score": 50,
+      "trend": "up"
     },
     {
-      "name": "Knight Shield",
-      "line": "BX",
-      "role": "Defense",
-      "tier": "S",
-      "note": "Benchmark defense blade; rounded, hard to burst."
+      "rank": 7,
+      "name": "Blitz",
+      "score": 50,
+      "trend": "same"
     },
     {
-      "name": "Rhino Horn",
-      "line": "BX",
-      "role": "Defense",
-      "tier": "A",
-      "note": "Weight-forward defense, good KO resistance."
-    },
-    {
-      "name": "Golem Rock",
-      "line": "CX",
-      "role": "Defense",
-      "tier": "A",
-      "note": "CX defense pick with heavy assist options."
-    },
-    {
-      "name": "Black Shell",
-      "line": "BX",
-      "role": "Defense",
-      "tier": "B",
-      "note": "Compact defensive blade."
-    },
-    {
-      "name": "Hells Scythe",
-      "line": "BX",
-      "role": "Balance",
-      "tier": "S",
-      "note": "Extremely versatile; stamina lean, great on many builds."
-    },
-    {
-      "name": "Wyvern Gale",
-      "line": "CX",
-      "role": "Balance",
-      "tier": "A",
-      "note": "CX balance with strong all-round stats."
-    },
-    {
-      "name": "Viper Tail",
-      "line": "BX",
-      "role": "Balance",
-      "tier": "B",
-      "note": "Defensive balance, low-cost option."
-    },
-    {
+      "rank": 8,
       "name": "Cobalt Dragoon",
-      "line": "BX",
-      "role": "Balance",
-      "tier": "B",
-      "note": "Balance attacker, fun but inconsistent top-level."
+      "score": 47,
+      "trend": "down"
+    },
+    {
+      "rank": 9,
+      "name": "Phoenix Wing",
+      "score": 44,
+      "trend": "up"
+    },
+    {
+      "rank": 10,
+      "name": "Silver Wolf",
+      "score": 44,
+      "trend": "up"
+    },
+    {
+      "rank": 11,
+      "name": "Blast",
+      "score": 43,
+      "trend": "down"
+    },
+    {
+      "rank": 12,
+      "name": "Tyranno Beat",
+      "score": 41,
+      "trend": "same"
+    },
+    {
+      "rank": 13,
+      "name": "Golem Rock",
+      "score": 35,
+      "trend": "same"
+    },
+    {
+      "rank": 14,
+      "name": "Scorpio Spear",
+      "score": 34,
+      "trend": "up"
+    },
+    {
+      "rank": 15,
+      "name": "Clock Mirage",
+      "score": 33,
+      "trend": "down"
     }
   ],
   "ratchets": [
     {
-      "name": "3-60",
-      "tier": "S",
-      "note": "Lowest common height; the attack standard."
-    },
-    {
-      "name": "9-60",
-      "tier": "S",
-      "note": "Low + 9 protrusions; great grip and stability for attack/balance."
-    },
-    {
-      "name": "4-60",
-      "tier": "A",
-      "note": "Low, 4 wide contact points; balanced attack option."
-    },
-    {
+      "rank": 1,
       "name": "1-60",
-      "tier": "A",
-      "note": "Low with minimal protrusions; smooth for stamina/attack."
+      "score": 100,
+      "trend": "same"
     },
     {
+      "rank": 2,
+      "name": "9-60",
+      "score": 75,
+      "trend": "same"
+    },
+    {
+      "rank": 3,
+      "name": "3-60",
+      "score": 57,
+      "trend": "same"
+    },
+    {
+      "rank": 4,
+      "name": "1-50",
+      "score": 57,
+      "trend": "same"
+    },
+    {
+      "rank": 5,
+      "name": "3-70",
+      "score": 56,
+      "trend": "up"
+    },
+    {
+      "rank": 6,
+      "name": "1-70",
+      "score": 55,
+      "trend": "down"
+    },
+    {
+      "rank": 7,
+      "name": "7-70",
+      "score": 55,
+      "trend": "same"
+    },
+    {
+      "rank": 8,
+      "name": "4-50",
+      "score": 51,
+      "trend": "down"
+    },
+    {
+      "rank": 9,
+      "name": "7-60",
+      "score": 51,
+      "trend": "down"
+    },
+    {
+      "rank": 10,
+      "name": "6-60",
+      "score": 42,
+      "trend": "same"
+    },
+    {
+      "rank": 11,
       "name": "5-60",
-      "tier": "A",
-      "note": "Low, even contact; solid all-rounder."
+      "score": 41,
+      "trend": "down"
     },
     {
-      "name": "3-80",
-      "tier": "S",
-      "note": "Tall defense/stamina height; strong vs low attackers."
-    },
-    {
+      "rank": 12,
       "name": "9-70",
-      "tier": "A",
-      "note": "Mid-tall stamina base with grip."
+      "score": 40,
+      "trend": "down"
     },
     {
-      "name": "5-70",
-      "tier": "A",
-      "note": "Mid-tall, popular stamina ratchet."
-    },
-    {
-      "name": "4-80",
-      "tier": "B",
-      "note": "Tall, situational anti-attack."
-    },
-    {
-      "name": "M (Metal) variants",
-      "tier": "A",
-      "note": "Added weight low in the combo; strong for defense and outspin."
+      "rank": 13,
+      "name": "1-80",
+      "score": 36,
+      "trend": "up"
     }
   ],
   "bits": [
     {
-      "name": "Flat",
-      "role": "Attack",
-      "tier": "S",
-      "note": "Fastest aggressive movement; the attack default."
+      "rank": 1,
+      "name": "Low Rush",
+      "score": 76,
+      "trend": "up"
     },
     {
-      "name": "Rush",
-      "role": "Attack",
-      "tier": "S",
-      "note": "Flat variant with a rubber rush tip; strong bank attack."
-    },
-    {
-      "name": "Accel",
-      "role": "Attack",
-      "tier": "A",
-      "note": "Rubber accel tip, aggressive with more control than Flat."
-    },
-    {
-      "name": "Low Flat",
-      "role": "Attack",
-      "tier": "A",
-      "note": "Lower Flat; faster, harder to control."
-    },
-    {
-      "name": "Cyclone",
-      "role": "Attack",
-      "tier": "A",
-      "note": "Rubber, moves in wide circles; good sustained pressure."
-    },
-    {
-      "name": "Ball",
-      "role": "Stamina",
-      "tier": "S",
-      "note": "The stamina/defense benchmark; huge staying power."
-    },
-    {
-      "name": "Orb",
-      "role": "Stamina",
-      "tier": "A",
-      "note": "Rounded stamina tip, good recovery."
-    },
-    {
-      "name": "Point",
-      "role": "Stamina",
-      "tier": "A",
-      "note": "Tiny tip, maximum spin retention on a clean floor."
-    },
-    {
-      "name": "Taper",
-      "role": "Stamina",
-      "tier": "A",
-      "note": "Between Ball and Point; balanced stamina."
-    },
-    {
-      "name": "Needle",
-      "role": "Stamina",
-      "tier": "B",
-      "note": "Sharp tip, high stamina but tippy."
-    },
-    {
-      "name": "High Taper",
-      "role": "Stamina",
-      "tier": "A",
-      "note": "Taller Taper; strong outspin vs low attackers."
-    },
-    {
-      "name": "Bound Spike",
-      "role": "Balance",
-      "tier": "S",
-      "note": "Spring-loaded tip; disrupts attackers and self-KOs less."
-    },
-    {
-      "name": "Gear Ball",
-      "role": "Defense",
-      "tier": "A",
-      "note": "Gear-driven Ball; extra burst and self-recovery."
-    },
-    {
+      "rank": 2,
       "name": "Hexa",
-      "role": "Defense",
-      "tier": "B",
-      "note": "Six-sided low tip; stable against attack."
+      "score": 74,
+      "trend": "down"
+    },
+    {
+      "rank": 3,
+      "name": "Rush",
+      "score": 66,
+      "trend": "same"
+    },
+    {
+      "rank": 4,
+      "name": "Level",
+      "score": 57,
+      "trend": "same"
+    },
+    {
+      "rank": 5,
+      "name": "Free Ball",
+      "score": 57,
+      "trend": "up"
+    },
+    {
+      "rank": 6,
+      "name": "Kick",
+      "score": 55,
+      "trend": "same"
+    },
+    {
+      "rank": 7,
+      "name": "Elevate",
+      "score": 50,
+      "trend": "down"
+    },
+    {
+      "rank": 8,
+      "name": "Ball",
+      "score": 45,
+      "trend": "same"
+    },
+    {
+      "rank": 9,
+      "name": "Jolt",
+      "score": 44,
+      "trend": "up"
+    },
+    {
+      "rank": 10,
+      "name": "Unite",
+      "score": 41,
+      "trend": "up"
+    },
+    {
+      "rank": 11,
+      "name": "Point",
+      "score": 40,
+      "trend": "down"
+    },
+    {
+      "rank": 12,
+      "name": "Low Orb",
+      "score": 39,
+      "trend": "same"
+    },
+    {
+      "rank": 13,
+      "name": "Wedge",
+      "score": 39,
+      "trend": "down"
+    },
+    {
+      "rank": 14,
+      "name": "Taper",
+      "score": 33,
+      "trend": "up"
     }
   ],
   "combos": [

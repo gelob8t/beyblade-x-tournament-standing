@@ -1,6 +1,7 @@
 // Weekly job: read community combo votes from Firestore and regenerate the
-// `combos` section (and the timestamp) of data/meta.json. The hand-curated
-// blades / ratchets / bits stay untouched — edit those by PR.
+// `combos` section (and the timestamp) of data/meta.json. The blades /
+// ratchets / bits rankings (a BBX Weekly snapshot, see `partsSource`) stay
+// untouched — bbxweekly.com has no API and blocks bots, so update them by PR.
 //
 // Runs in CI from .github/workflows/meta.yml with a service-account key in
 // the GCP_SA_KEY secret (role: Cloud Datastore Viewer). Run locally with:

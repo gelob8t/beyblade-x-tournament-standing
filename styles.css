@@ -575,6 +575,14 @@ textarea { resize: vertical; }
 
 /* ---------- collection ---------- */
 .collection-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.2rem; }
+.rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; }
+.rank-list li { display: flex; align-items: center; gap: .7rem; padding-bottom: .55rem; border-bottom: 1px solid var(--bg-2); font-size: .9rem; }
+.rank-list li:last-child { border-bottom: none; padding-bottom: 0; }
+.rank-num { font-family: var(--font-display); font-weight: 700; color: var(--muted); width: 2.2em; flex: none; }
+.rank-main { flex: 1; min-width: 0; display: grid; gap: .3rem; }
+.rank-main .bar { height: 6px; }
+.rank-score { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; width: 2.2em; text-align: right; flex: none; }
+.rank-list .trend { width: 1em; text-align: center; }
 .part-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
 .part-list li { display: flex; justify-content: space-between; gap: .6rem; align-items: center; padding-bottom: .5rem; border-bottom: 1px solid var(--bg-2); font-size: .9rem; }
 .part-row-main { display: flex; align-items: center; gap: .5rem; min-width: 0; }

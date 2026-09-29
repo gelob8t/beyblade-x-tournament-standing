@@ -2914,6 +2914,7 @@ async function loadMeta() {
     refreshedAt: curated.refreshedAt || null,
     note: curated.note,
     roles: curated.roles || ["Attack", "Stamina", "Defense", "Balance"],
+    partsSource: curated.partsSource || null,
     blades: curated.blades || [],
     ratchets: curated.ratchets || [],
     bits: curated.bits || [],
@@ -3040,31 +3041,45 @@ function metaCombosPanel(panel) {
   );
 }
 
+// Blade / Ratchet / Bit rankings, snapshotted from BBX Weekly (see
+// data/meta.json → partsSource). Role and line come from the parts catalog.
 function metaPartsPanel(panel, kind) {
-  const items = state.meta[kind] || [];
+  const type = { blades: "Blade", ratchets: "Ratchet", bits: "Bit" }[kind];
+  const src = state.meta.partsSource;
+  const items = (state.meta[kind] || []).map((i) => {
+    const part = catalogPart(type, i.name);
+    return { ...i, part, role: i.role || part?.role || "", line: i.line || part?.system || "" };
+  });
   const roles = ["", ...state.meta.roles];
   state.metaRoleFilter = state.metaRoleFilter || "";
   const rf = state.metaRoleFilter;
   const hasRoles = items.some((i) => i.role);
   const filtered = rf ? items.filter((i) => i.role === rf) : items;
-  const byTier = { S: [], A: [], B: [], C: [], D: [] };
-  for (const i of filtered) (byTier[i.tier] || byTier.B).push(i);
+  const top = Math.max(1, ...items.map((i) => i.score || 0));
 
   panel.innerHTML = `
     ${hasRoles ? `<div class="filter-bar">
       ${roles.map((r) => `<button class="chip${rf === r ? " chip--accent" : ""}" data-role="${esc(r)}">${r || "All"}</button>`).join("")}
     </div>` : ""}
-    ${["S", "A", "B", "C", "D"].filter((t) => byTier[t].length).map((t) => `
-      <section class="panel">
-        <h2><span class="tier tier--${t}">${t}</span> tier</h2>
-        <ul class="part-list">
-          ${byTier[t].map((i) => `<li>
+    <section class="panel">
+      <h2>Top ${items.length} ${esc(kind)}</h2>
+      ${src ? `<p class="muted small">${esc(src.metric)}: ${esc(src.basis)} —
+        ${esc(src.events)} events, ${fmtDate(src.start)} – ${fmtDate(src.end)}.
+        Source: <a href="${esc(src.url)}" target="_blank" rel="noopener">${esc(src.name)}</a> (${esc(src.week)}).</p>` : ""}
+      ${filtered.length ? `<ol class="rank-list">
+        ${filtered.map((i) => `<li>
+          <span class="rank-num">#${i.rank}</span>
+          ${partIcon(i.part || { type, name: i.name }, 32)}
+          <div class="rank-main">
             <div><b>${esc(i.name)}</b>${i.line ? ` <span class="chip">${esc(i.line)}</span>` : ""}${i.role ? ` <span class="chip">${esc(i.role)}</span>` : ""}
-              ${i.note ? `<div class="muted small">${esc(i.note)}</div>` : ""}</div>
-            ${ownsPart(i.name) ? `<span class="chip chip--accent">owned</span>` : ""}
-          </li>`).join("")}
-        </ul>
-      </section>`).join("")}
+              ${ownsPart(i.name) ? ` <span class="chip chip--accent">owned</span>` : ""}</div>
+            <div class="bar"><span style="width:${Math.round(((i.score || 0) / top) * 100)}%"></span></div>
+          </div>
+          <span class="rank-score" title="${esc(src ? src.metric : "Score")}">${i.score ?? "—"}</span>
+          <span class="trend trend--${esc(i.trend || "same")}" title="${i.trend === "up" ? "moved up" : i.trend === "down" ? "moved down" : "no change"}">${TREND_MARK[i.trend] || ""}</span>
+        </li>`).join("")}
+      </ol>` : `<p class="muted">No ${esc(kind)} with that role in the top ${items.length}.</p>`}
+    </section>
   `;
 
   $$("[data-role]", panel).forEach((b) =>
