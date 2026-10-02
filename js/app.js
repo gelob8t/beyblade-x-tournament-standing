@@ -2416,11 +2416,15 @@ function liveScoring(template) {
 // ---------------------------------------------------------------------------
 const PART_TYPES = ["Blade", "Ratchet", "Bit"];
 
-/** Find a loaded-catalog entry for an owned part, by type + name (case-insensitive). */
+/** Find a loaded-catalog entry for an owned part, by type + name. Ignores
+ *  case, spaces and punctuation, so "MummyCurse" / "mummy-curse" find
+ *  "Mummy Curse" and "7–55" finds "7-55". */
+const partKey = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 function catalogPart(type, name) {
-  const n = String(name || "").trim().toLowerCase();
+  const n = partKey(name);
+  if (!n) return null;
   const all = (state.catalog && state.catalog.parts) || [];
-  return all.find((p) => p.type === type && p.name.toLowerCase() === n) || null;
+  return all.find((p) => p.type === type && partKey(p.name) === n) || null;
 }
 
 function renderCollection(main) {
