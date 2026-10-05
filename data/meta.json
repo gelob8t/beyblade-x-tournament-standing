@@ -1,5 +1,5 @@
 {
-  "updated": "2026-09-28",
+  "updated": "2026-10-05",
   "note": "Combo tiers come from community votes, refreshed weekly. Blade, Ratchet and Bit rankings are BBX Weekly's top 15 (or fewer), based on podium finishes at official WBO events.",
   "partsSource": {
     "name": "BBX Weekly",
@@ -389,6 +389,6 @@
       "note": "Anti-attack, disrupts the aggressor's path."
     }
   ],
-  "refreshedAt": "2026-09-28T13:19:14.529Z",
+  "refreshedAt": "2026-10-05T14:02:25.307Z",
   "communityVotes": 2
 }
