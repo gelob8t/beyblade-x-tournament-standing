@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-02",
-  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B, Dragoon Storm, Hells Nether, Wyvern Hover, Mummy Curse, plus ratchets 8-80 and 7-55 and bit Zap). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "updated": "2026-10-06",
+  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B, Dragoon Storm, Hells Nether, Wyvern Hover, Mummy Curse, plus ratchets 8-80 and 7-55 and bits Zap and Jolt). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
   "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.webp. WebP is strongly recommended over PNG/JPG for these — typically 8-15x smaller at the same visual quality, which is most of why the catalog loads fast. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
   "imageBase": "./assets/parts/",
   "imageExt": ".webp",
@@ -121,6 +121,7 @@
     { "name": "Under Needle", "role": "Stamina", "note": "Lower Needle variant." },
     { "name": "Metal Needle", "role": "Stamina", "note": "Weighted Needle; better stability." },
     { "name": "Zap", "role": "", "note": "User-reported; not yet on beybxdb.com. Role unconfirmed." },
+    { "name": "Jolt", "role": "", "note": "User-reported; not yet on beybxdb.com. Role unconfirmed." },
     { "name": "Gear Needle", "role": "Stamina", "note": "Needle with a gear-driven kick; stamina with disruption." },
     { "name": "Vortex", "role": "Stamina", "note": "Rubber stamina tip." },
     { "name": "Level", "role": "Balance", "note": "Wide low bearing; balance/stamina." },
