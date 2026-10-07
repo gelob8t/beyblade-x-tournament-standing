@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-06",
-  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B, Dragoon Storm, Hells Nether, Wyvern Hover, Mummy Curse, Tyranno Roar, plus ratchets 8-80, 7-55, 6-60 and 6-80 and bits Zap and Jolt). `ratchetIntegrated: true` marks a blade with a built-in ratchet (its combos have no separate ratchet). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "updated": "2026-10-07",
+  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B, Dragoon Storm, Hells Nether, Wyvern Hover, Mummy Curse, Tyranno Roar, plus ratchets 8-80, 7-55, 6-60, 6-80 and 1-50 and bits Zap, Jolt and Ignition). `ratchetIntegrated: true` marks a blade with a built-in ratchet (its combos have no separate ratchet). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
   "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.webp. WebP is strongly recommended over PNG/JPG for these — typically 8-15x smaller at the same visual quality, which is most of why the catalog loads fast. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
   "imageBase": "./assets/parts/",
   "imageExt": ".webp",
@@ -72,6 +72,7 @@
   ],
   "ratchets": [
     { "name": "0-80", "peaks": 0, "height": 80, "note": "Tall, no protrusions — smoothest possible contact; pure stamina/defense height." },
+    { "name": "1-50", "peaks": 1, "height": 50, "note": "Extra-low with a single protrusion. User-reported; not yet on beybxdb.com." },
     { "name": "1-60", "peaks": 1, "height": 60, "note": "Low with minimal protrusions; smooth for stamina/attack." },
     { "name": "1-80", "peaks": 1, "height": 80, "note": "Tall, smooth; anti-attack stamina." },
     { "name": "2-60", "peaks": 2, "height": 60, "note": "Low, minimal contact." },
@@ -124,6 +125,7 @@
     { "name": "Under Needle", "role": "Stamina", "note": "Lower Needle variant." },
     { "name": "Metal Needle", "role": "Stamina", "note": "Weighted Needle; better stability." },
     { "name": "Zap", "role": "", "note": "User-reported; not yet on beybxdb.com. Role unconfirmed." },
+    { "name": "Ignition", "role": "", "note": "User-reported; not yet on beybxdb.com. Role unconfirmed." },
     { "name": "Jolt", "role": "Attack", "note": "User-reported; not yet on beybxdb.com. Attack type (per user)." },
     { "name": "Gear Needle", "role": "Stamina", "note": "Needle with a gear-driven kick; stamina with disruption." },
     { "name": "Vortex", "role": "Stamina", "note": "Rubber stamina tip." },
