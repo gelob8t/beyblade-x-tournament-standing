@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   FORMATS, formatOf, validateDeck, comboStats, deckPoints,
-  encodeDeck, decodeDeck, randomizeDeck,
+  encodeDeck, decodeDeck, randomizeDeck, ratchetIntegrated,
 } from "../js/decks.js";
 
 const PARTS = {
@@ -14,6 +14,7 @@ const PARTS = {
     { name: "Wizard Rod", role: "Stamina", points: 5 },
     { name: "Shark Edge", role: "Attack", points: 2 },
     { name: "Mystery", role: "" },
+    { name: "Glory Valkyrie", role: "Attack", points: 4, ratchetIntegrated: true },
   ],
   Ratchet: [
     { name: "3-60", points: 2, stats: { def: 5 } },
@@ -146,4 +147,22 @@ test("randomizeDeck keeps locked combos and returns null when impossible", () =>
   assert.notEqual(d.combos[1].blade, "Dran Sword");
   // only two Attack bits exist, so three All Attack beys can't be built
   assert.equal(randomizeDeck({ format: "all-attack", combos: [{}, {}, {}] }, PARTS, { rng: seeded(1), tries: 50 }), null);
+});
+
+test("ratchet-integrated blades need no ratchet, and can't take one", () => {
+  assert.equal(ratchetIntegrated({ blade: "glory valkyrie" }, lookup), true);
+  assert.equal(ratchetIntegrated({ blade: "Dran Sword" }, lookup), false);
+  const ok = validateDeck(deck("standard", ["Glory Valkyrie", "", "Flat"], ["Knight Shield", "4-60", "Needle"]), lookup);
+  assert.equal(ok.ok, true, ok.errors.join(" "));
+  const extra = validateDeck(deck("standard", ["Glory Valkyrie", "3-60", "Flat"]), lookup);
+  assert.match(extra.errors.join(" "), /Glory Valkyrie has a built-in ratchet — remove 3-60/);
+  // a normal blade still needs its ratchet
+  assert.match(validateDeck(deck("standard", ["Dran Sword", "", "Flat"]), lookup).errors.join(" "), /missing a part/);
+});
+
+test("randomizeDeck leaves the ratchet empty for a ratchet-integrated blade", () => {
+  const pool = { ...PARTS, Blade: [PARTS.Blade.find((b) => b.ratchetIntegrated)] };
+  const d = randomizeDeck({ format: "standard", combos: [{}] }, pool, { rng: seeded(5) });
+  assert.equal(d.combos[0].blade, "Glory Valkyrie");
+  assert.equal(d.combos[0].ratchet, "");
 });

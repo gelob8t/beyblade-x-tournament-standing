@@ -2853,6 +2853,16 @@ function renderDeckBuilder(main) {
 
   const slot = (c, i, k, type) => {
     const name = c[k];
+    if (k === "ratchet" && !name && decks.ratchetIntegrated(c, catalogPart)) {
+      return `<div class="deck-slot is-integrated" title="${esc(c.blade)} has a built-in ratchet">
+        <span class="deck-slot-plus" aria-hidden="true">✓</span>
+        <span class="deck-slot-main">
+          <span class="deck-slot-type">${type}</span>
+          <b>Built into blade</b>
+          <span class="muted small">no ratchet needed</span>
+        </span>
+      </div>`;
+    }
     const part = name ? catalogPart(type, name) : null;
     const dupe = name && check.dupes.has(type + "|" + name.trim().toLowerCase());
     const metaBits = [part?.role, part?.points != null ? `${part.points} pts` : ""].filter(Boolean).join(" · ");
@@ -3019,6 +3029,7 @@ function openPartPicker(i, k) {
 
   const choose = (name) => {
     d.combos[i][k] = name;
+    if (k === "blade" && decks.ratchetIntegrated(d.combos[i], catalogPart)) d.combos[i].ratchet = "";
     d.dirty = true;
     modal.close();
     render();
@@ -3111,7 +3122,7 @@ function sharedDeckPreview(shared, { signedIn }) {
         <span class="rank-num">${i + 1}</span>
         ${decks.PART_KEYS.map(([k, type]) => `<span class="deck-preview-part">
           ${c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 44) : ""}
-          <span class="small">${esc(c[k] || "—")}</span>
+          <span class="small">${esc(c[k] || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in ratchet" : "—"))}</span>
         </span>`).join("")}
       </div>`).join("")}
       <div class="form-actions">
@@ -3227,7 +3238,8 @@ async function drawDeckImage(d) {
       ctx.fillText(type.toUpperCase(), cx + colW / 2, y0 + 190);
       ctx.fillStyle = SHARE_COLORS.text;
       ctx.font = '700 26px "Chakra Petch"';
-      ctx.fillText(shareTruncate(ctx, c[k] || "—", colW - 16), cx + colW / 2, y0 + 222);
+      const label = c[k] || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in" : "—");
+      ctx.fillText(shareTruncate(ctx, label, colW - 16), cx + colW / 2, y0 + 222);
     }
 
     if (statsFor[i]) {

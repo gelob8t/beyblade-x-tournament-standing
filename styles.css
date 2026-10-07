@@ -1026,3 +1026,6 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
 .deck-preview-row:last-of-type { border-bottom: none; }
 .deck-preview-part { display: grid; justify-items: center; gap: .25rem; text-align: center; min-width: 0; }
 .deck-preview-part .small { overflow-wrap: anywhere; }
+.deck-slot.is-integrated { cursor: default; border-style: dashed; color: var(--muted); }
+.deck-slot.is-integrated:hover { border-color: var(--line); background: var(--bg-2); }
+.deck-slot.is-integrated .deck-slot-plus { color: var(--win); border-color: rgba(36, 209, 122, .4); font-size: 1.1rem; }

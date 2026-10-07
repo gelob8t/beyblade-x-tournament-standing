@@ -36,7 +36,11 @@ export function formatOf(key) {
 }
 
 const norm = (s) => String(s || "").trim().toLowerCase();
-const filled = (c) => !!(c && (c.blade || c.ratchet || c.bit));
+
+/** True when the combo's blade has a built-in ratchet (no ratchet slot). */
+export function ratchetIntegrated(combo, lookup) {
+  return !!(combo && combo.blade && lookup("Blade", combo.blade)?.ratchetIntegrated);
+}
 
 /** Summed stats for one combo, or null when none of its parts has stats. */
 export function comboStats(combo, lookup) {
@@ -80,8 +84,13 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
   const warnings = [];
 
   if (f.size && combos.length !== f.size) errors.push(`${f.label} decks have exactly ${f.size} beys.`);
-  const incomplete = combos.filter((c) => !(c.blade && c.ratchet && c.bit)).length;
+  const incomplete = combos.filter((c) => !(c.blade && c.bit && (c.ratchet || ratchetIntegrated(c, lookup)))).length;
   if (incomplete) errors.push(`${incomplete} bey${incomplete === 1 ? " is" : "s are"} missing a part.`);
+  combos.forEach((c, i) => {
+    if (c.ratchet && ratchetIntegrated(c, lookup)) {
+      errors.push(`Bey ${i + 1}: ${c.blade} has a built-in ratchet — remove ${c.ratchet}.`);
+    }
+  });
 
   // no repeating parts — every format
   const seen = new Map();
@@ -244,7 +253,7 @@ export function randomizeDeck(deck, pool, { locked = [], budget = null, rng = Ma
         return p.name;
       };
       const blade = choose("Blade", role);
-      const ratchet = choose("Ratchet");
+      const ratchet = blade && lookup("Blade", blade)?.ratchetIntegrated ? "" : choose("Ratchet");
       const bit = choose("Bit", role);
       return { blade: blade || "", ratchet: ratchet || "", bit: bit || "" };
     });

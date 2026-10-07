@@ -46,6 +46,7 @@ export async function loadCatalog() {
         spin: p.spin || "",
         height: p.height ?? null,
         peaks: p.peaks ?? null,
+        ratchetIntegrated: !!p.ratchetIntegrated, // blade with a built-in ratchet
         note: p.note || "",
         // explicit URL wins; otherwise derive one from imageBase + slug
         image: p.image || (base && slug ? base + slug + ext : ""),
