@@ -1,7 +1,7 @@
 // Run: node --test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesPartQuery, queryCatalog, roleColor, slugify } from "../js/catalog.js";
+import { matchesPartQuery, queryCatalog, roleColor, slugify, applyPartStats } from "../js/catalog.js";
 
 const PARTS = [
   { type: "Blade", name: "Dran Sword", system: "BX", role: "Attack", spin: "Right", note: "original attacker" },
@@ -51,4 +51,28 @@ test("slugify: file-name-safe part slugs", () => {
   assert.equal(slugify("M (Metal) variants"), "m-metal-variants");
   assert.equal(slugify("  Under  Flat  "), "under-flat");
   assert.equal(slugify(""), "");
+});
+
+test("applyPartStats: attaches numeric points/stats by type + name, ignoring case", () => {
+  const parts = [
+    { type: "Blade", name: "Dran Sword" },
+    { type: "Bit", name: "Dran Sword" },
+    { type: "Ratchet", name: "3-60" },
+  ];
+  applyPartStats(parts, {
+    Blade: { "dran sword": { points: 4, atk: 60, def: null, sta: "x" } },
+    Ratchet: { "3-60": { points: null, atk: null } },
+  });
+  assert.equal(parts[0].points, 4);
+  assert.deepEqual(parts[0].stats, { atk: 60 });
+  assert.equal(parts[1].points, null); // same name, different type
+  assert.equal(parts[1].stats, null);
+  assert.equal(parts[2].stats, null); // all null -> no stats
+});
+
+test("applyPartStats: tolerates a missing stats file", () => {
+  const parts = [{ type: "Blade", name: "Dran Sword" }];
+  applyPartStats(parts, null);
+  assert.equal(parts[0].points, null);
+  assert.equal(parts[0].stats, null);
 });

@@ -56,9 +56,18 @@ export async function loadCatalog() {
     ...tag(raw.ratchets, "Ratchet"),
     ...tag(raw.bits, "Bit"),
   ];
+  // deck-builder stats/points live in their own file; missing is fine
+  let statsRaw = null;
+  try {
+    const sres = await fetch("./data/part-stats.json", { cache: "no-cache" });
+    if (sres.ok) statsRaw = await sres.json();
+  } catch { /* no stats yet */ }
+  applyPartStats(parts, statsRaw);
   cache = {
     updated: raw.updated || "",
     note: raw.note || "",
+    limitedBudget: typeof statsRaw?.limitedBudget === "number" ? statsRaw.limitedBudget : null,
+    statMax: typeof statsRaw?.statMax === "number" && statsRaw.statMax > 0 ? statsRaw.statMax : 150,
     roleColors: { ...ROLE_COLORS, ...(raw.roleColors || {}) },
     blades: parts.filter((p) => p.type === "Blade"),
     ratchets: parts.filter((p) => p.type === "Ratchet"),
@@ -66,6 +75,28 @@ export async function loadCatalog() {
     parts,
   };
   return cache;
+}
+
+const STAT_FIELDS = ["atk", "def", "sta", "xd", "br"];
+
+/**
+ * Copy points/stats from data/part-stats.json ({ Blade: { name: {...} } })
+ * onto catalog parts, in place. Names match ignoring case; only real numbers
+ * are kept, so `stats` is null until at least one stat is filled in.
+ */
+export function applyPartStats(parts, raw) {
+  const byType = {};
+  for (const type of ["Blade", "Ratchet", "Bit"]) {
+    byType[type] = new Map(Object.entries((raw && raw[type]) || {}).map(([n, v]) => [n.trim().toLowerCase(), v]));
+  }
+  for (const p of parts) {
+    const v = byType[p.type]?.get(p.name.toLowerCase()) || {};
+    p.points = typeof v.points === "number" ? v.points : null;
+    const stats = {};
+    for (const k of STAT_FIELDS) if (typeof v[k] === "number") stats[k] = v[k];
+    p.stats = Object.keys(stats).length ? stats : null;
+  }
+  return parts;
 }
 
 export function roleColor(role, catalog) {

@@ -12,7 +12,7 @@ hosted on **GitHub Pages**, and installable as a **PWA** (Add to Home Screen).
 | **Tournaments** | Name, date, location, format, final placement, W–L, notes. **Import from Challonge** — paste a tournament link, pick which participant was you, and it creates the tournament + your matches (result + score) in one go. |
 | **Matches** | Opponent, your deck, opponent deck, per-game winner + finish type (Spin / Over / Burst / Xtreme), notes. Once a deck has combos, each game can also be tagged with **which bey played it** — decks often mix beys game to game, so this is tracked per game, not per match. |
 | **Collection** | Owned Blades, Ratchets and Bits. **Browse catalog** opens a searchable, filterable picker (by type / role / system) with a generated icon per part — tick several and add them at once. Name fields also autocomplete from the catalog. Hover any part photo (mouse only) to float a larger preview. |
-| **Decks** | Named 3-Bey decks with per-slot combos; auto win rate from matches |
+| **Decks** | Deck builder: pick each bey's Blade / Ratchet / Bit from the catalog (photos, roles, owned), 1–5 beys, checked live against a format — Standard (no repeated parts), Limited (point budget), B.A.D, D.A.B, B.A.D / D.A.B Limited, All Attack. Randomize one bey or the whole deck (from the catalog or only your collection), per-combo stat bars, a **share link** (`?deck=…`, opens a preview for anyone and a copy for signed-in users) and a downloadable **deck image**. Stats and points come from `data/part-stats.json`. Auto win rate from matches. |
 | **Dashboard** | Match & game win rate, finish-type breakdown (scored / conceded), win rate by deck, recent form, best placement, top-performing bey |
 | **Share stats** | Generates a themed stats card (record, best finish, achievements, top deck) as a PNG. **Share…** opens the OS share sheet where supported — any app, any social network, Instagram/TikTok included if installed. Always available: download, copy to clipboard, one-tap X/Facebook/WhatsApp/Reddit links, and an Instagram/TikTok shortcut that downloads the image ready to post from your gallery. |
 | **Profile** | Profile picture, blader name, region, home store, main Bey, bio; JSON **export** of all your data, and **import / restore** from that file (adds only what's not already there) |
@@ -153,10 +153,12 @@ js/
   catalog.js           parts catalog loader + filter + slugify (data/parts.json)
   challonge.js         Challonge import: URL parsing + payload shaping (no fetch)
   sharecard.js         share-stats data shaping (canvas drawing lives in app.js)
+  decks.js             deck builder rules: formats, stat/point totals, share links, randomizer
   app.js               auth flow, views, forms, wiring
 scripts/part-slugs.mjs  `npm run parts:slugs` — list part image file names
 data/meta.json         curated tier-list snapshot (edit or PR to update)
 data/parts.json        parts catalog for the collection picker (community-maintained; PRs welcome)
+data/part-stats.json   deck-builder stats + Limited points per part, and the Limited budget (fill in; null = unknown)
 firestore.rules        security rules (auto-deployed if FIREBASE_TOKEN is set)
 firebase.json          points firebase-tools at firestore.rules
 test/stats.test.mjs    unit tests, run in CI before every deploy
@@ -175,7 +177,7 @@ users/{uid}/matches/{id}       { date, tournamentId, opponent, myDeck, opponentD
                                             combo: { blade, ratchet, bit } | null }],
                                  result, notes }
 users/{uid}/beys/{id}          { type: "Blade"|"Ratchet"|"Bit", name, notes }
-users/{uid}/decks/{id}         { name, combos: [{ blade, ratchet, bit }], notes }
+users/{uid}/decks/{id}         { name, format, combos: [{ blade, ratchet, bit }], notes }
 
 teamCodes/{CODE}              { teamId }                       // invite-code lookup
 teams/{teamId}               { name, tag, region, color, bio, founded,

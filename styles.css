@@ -976,3 +976,53 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
 @media (max-width: 360px) {
   .stat-grid { grid-template-columns: 1fr; }
 }
+
+/* ---------- deck builder ---------- */
+.chip--danger { color: var(--loss); border-color: rgba(255, 77, 99, .4); background: rgba(255, 77, 99, .1); }
+.danger-text { color: var(--loss); }
+.deck-mini { display: grid; gap: .3rem; margin: .4rem 0 .2rem; font-size: .9rem; }
+.deck-mini-row { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+.deck-mini-icons { display: inline-flex; gap: .2rem; flex: none; }
+
+.deck-setup { display: grid; grid-template-columns: 2fr auto 1fr; gap: .9rem 1.2rem; align-items: end; }
+.deck-setup-desc { grid-column: 1 / -1; margin: 0; }
+.stepper { display: flex; align-items: center; gap: .6rem; }
+.stepper b { font-family: var(--font-display); font-size: 1.3rem; min-width: 1.2em; text-align: center; }
+@media (max-width: 640px) { .deck-setup { grid-template-columns: 1fr auto; } .deck-setup-name { grid-column: 1 / -1; } }
+
+.deck-combo-head { display: flex; align-items: center; gap: .8rem; margin-bottom: .8rem; }
+.deck-combo-head h2 { margin: 0; }
+.deck-combo-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+@media (max-width: 640px) { .deck-slots { grid-template-columns: 1fr; } }
+.deck-slot {
+  display: flex; align-items: center; gap: .7rem; text-align: left; min-width: 0;
+  background: var(--bg-2); border: 1px solid var(--line); color: var(--text);
+  padding: .65rem .75rem; cursor: pointer; font: inherit; transition: border-color .15s ease, background .12s ease;
+}
+.deck-slot:hover { border-color: var(--line-bright); background: var(--panel-2); }
+.deck-slot.is-empty { border-style: dashed; color: var(--muted); }
+.deck-slot.is-dupe { border-color: var(--loss); background: rgba(255, 77, 99, .08); }
+.deck-slot-plus { width: 44px; height: 44px; display: grid; place-items: center; flex: none; font-size: 1.5rem; border: 1px dashed var(--line-bright); border-radius: 50%; }
+.deck-slot-main { display: grid; gap: .05rem; min-width: 0; }
+.deck-slot-main b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deck-slot-type { font-family: var(--font-display); font-size: .7rem; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.deck-stats { margin-top: .9rem; }
+
+.deck-summary { display: grid; gap: .7rem; }
+.deck-summary h2 { margin: 0; }
+.deck-summary p { margin: 0; }
+.deck-ok { color: var(--win); font-weight: 600; }
+.deck-errors { margin: 0; padding-left: 1.2rem; color: var(--loss); display: grid; gap: .2rem; }
+.deck-warnings { margin: 0; padding-left: 1.2rem; display: grid; gap: .15rem; }
+.deck-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.deck-actions-spacer { flex: 1; }
+.deck-rand-src { display: inline-flex; align-items: center; gap: .4rem; }
+.deck-rand-src select { width: auto; }
+.catalog-card[disabled] { opacity: .45; cursor: not-allowed; }
+.pp-custom { justify-self: start; }
+
+.deck-preview-row { display: grid; grid-template-columns: 1.6rem repeat(3, 1fr); gap: .5rem; align-items: start; padding: .5rem 0; border-bottom: 1px solid var(--bg-2); }
+.deck-preview-row:last-of-type { border-bottom: none; }
+.deck-preview-part { display: grid; justify-items: center; gap: .25rem; text-align: center; min-width: 0; }
+.deck-preview-part .small { overflow-wrap: anywhere; }

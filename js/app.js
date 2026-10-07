@@ -17,6 +17,7 @@ import * as meta from "./meta.js";
 import * as catalog from "./catalog.js";
 import * as challonge from "./challonge.js";
 import * as sharecard from "./sharecard.js";
+import * as decks from "./decks.js";
 import {
   FINISHES, finishLabel, finishPts,
   matchScore, matchResult, ordinal, groupRecord, streaks, achievements,
@@ -1667,6 +1668,80 @@ async function drawShareCard(data, avatarSrc) {
   return canvas;
 }
 
+// Preview + Share / Download / Copy / social links for a generated PNG.
+function presentShareImage(box, { blob, fileName, text, shareUrl, shareTitle, alt }) {
+  const file = new File([blob], fileName, { type: "image/png" });
+  const objectUrl = URL.createObjectURL(blob);
+  const canNativeShare = !!navigator.share;
+  const canCopyImage = !!(navigator.clipboard && window.ClipboardItem);
+
+  const download = () => {
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.append(a);
+    a.click();
+    a.remove();
+  };
+
+  // Instagram and TikTok don't accept posts from a web page at all — the
+  // OS share sheet (Share… below, on a phone with the app installed) is
+  // the only direct route; otherwise it's download-then-post-from-gallery.
+  box.innerHTML = `
+    <div class="share-card-preview"><img src="${objectUrl}" alt="${esc(alt)}" /></div>
+    <div class="share-card-actions">
+      ${canNativeShare ? `<button class="btn btn-primary" id="sc-share">Share…</button>` : ""}
+      <button class="btn ${canNativeShare ? "btn-ghost" : "btn-primary"}" id="sc-download">Download image</button>
+      <button class="btn btn-ghost" id="sc-copy"${canCopyImage ? "" : ` disabled title="Copying images isn't supported in this browser"`}>Copy image</button>
+    </div>
+    <div class="share-card-links">
+      <p class="muted small">Share directly:</p>
+      <div class="share-card-chips">
+        <a class="btn-link" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}">X / Twitter</a>
+        <a class="btn-link" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}">Facebook</a>
+        <a class="btn-link" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}">WhatsApp</a>
+        <a class="btn-link" target="_blank" rel="noopener" href="https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(text)}">Reddit</a>
+        <button type="button" class="btn-link" id="sc-ig">Instagram</button>
+        <button type="button" class="btn-link" id="sc-tt">TikTok</button>
+      </div>
+      <p class="muted small">Instagram and TikTok don't accept posts from a web page — <b>Share…</b> opens them directly if you're on your phone with the app installed; otherwise Instagram/TikTok above downloads the image so you can post it from your gallery.</p>
+    </div>
+  `;
+
+  box.querySelector("#sc-download").addEventListener("click", download);
+  box.querySelector("#sc-ig").addEventListener("click", () => { download(); toast("Image downloaded — open Instagram and post it from your gallery."); });
+  box.querySelector("#sc-tt").addEventListener("click", () => { download(); toast("Image downloaded — open TikTok and post it from your gallery."); });
+
+  const copyBtn = box.querySelector("#sc-copy");
+  if (canCopyImage) {
+    copyBtn.addEventListener("click", () => runBtn(copyBtn, "Copying…", async () => {
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      toast("Image copied — paste it anywhere.");
+    }));
+  }
+
+  const shareBtn = box.querySelector("#sc-share");
+  if (shareBtn) {
+    shareBtn.addEventListener("click", () => runBtn(shareBtn, "Sharing…", async () => {
+      let canFiles = false;
+      try { canFiles = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { canFiles = false; }
+      try {
+        if (canFiles) {
+          await navigator.share({ files: [file], title: shareTitle, text });
+        } else {
+          download();
+          await navigator.share({ title: shareTitle, text, url: shareUrl });
+          toast("Image downloaded — attach it in the share sheet if it doesn't already have one.");
+        }
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // user closed the sheet — not an error
+        console.error(err);
+        toast(`Couldn't open the share sheet${err && err.message ? ": " + err.message : ""}. Try Download or Copy instead.`, "err");
+      }
+    }));
+  }
+}
+
 async function shareStatsCard() {
   const box = document.createElement("div");
   box.className = "share-card-modal";
@@ -1686,79 +1761,14 @@ async function shareStatsCard() {
     );
     if (!blob) throw new Error("Couldn't export the card as an image");
 
-    const fileName = `beyblade-x-stats-${today()}.png`;
-    const file = new File([blob], fileName, { type: "image/png" });
-    const text = sharecard.shareText(data);
-    const shareUrl = location.origin + location.pathname;
-    const objectUrl = URL.createObjectURL(blob);
-    const canNativeShare = !!navigator.share;
-    const canCopyImage = !!(navigator.clipboard && window.ClipboardItem);
-
-    const download = () => {
-      const a = document.createElement("a");
-      a.href = objectUrl;
-      a.download = fileName;
-      document.body.append(a);
-      a.click();
-      a.remove();
-    };
-
-    // Instagram and TikTok don't accept posts from a web page at all — the
-    // OS share sheet (Share… below, on a phone with the app installed) is
-    // the only direct route; otherwise it's download-then-post-from-gallery.
-    box.innerHTML = `
-      <div class="share-card-preview"><img src="${objectUrl}" alt="Your Beyblade X stats card" /></div>
-      <div class="share-card-actions">
-        ${canNativeShare ? `<button class="btn btn-primary" id="sc-share">Share…</button>` : ""}
-        <button class="btn ${canNativeShare ? "btn-ghost" : "btn-primary"}" id="sc-download">Download image</button>
-        <button class="btn btn-ghost" id="sc-copy"${canCopyImage ? "" : ` disabled title="Copying images isn't supported in this browser"`}>Copy image</button>
-      </div>
-      <div class="share-card-links">
-        <p class="muted small">Share directly:</p>
-        <div class="share-card-chips">
-          <a class="btn-link" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}">X / Twitter</a>
-          <a class="btn-link" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}">Facebook</a>
-          <a class="btn-link" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(text + " " + shareUrl)}">WhatsApp</a>
-          <a class="btn-link" target="_blank" rel="noopener" href="https://www.reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(text)}">Reddit</a>
-          <button type="button" class="btn-link" id="sc-ig">Instagram</button>
-          <button type="button" class="btn-link" id="sc-tt">TikTok</button>
-        </div>
-        <p class="muted small">Instagram and TikTok don't accept posts from a web page — <b>Share…</b> opens them directly if you're on your phone with the app installed; otherwise Instagram/TikTok above downloads the image so you can post it from your gallery.</p>
-      </div>
-    `;
-
-    box.querySelector("#sc-download").addEventListener("click", download);
-    box.querySelector("#sc-ig").addEventListener("click", () => { download(); toast("Image downloaded — open Instagram and post it from your gallery."); });
-    box.querySelector("#sc-tt").addEventListener("click", () => { download(); toast("Image downloaded — open TikTok and post it from your gallery."); });
-
-    const copyBtn = box.querySelector("#sc-copy");
-    if (canCopyImage) {
-      copyBtn.addEventListener("click", () => runBtn(copyBtn, "Copying…", async () => {
-        await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-        toast("Image copied — paste it anywhere.");
-      }));
-    }
-
-    const shareBtn = box.querySelector("#sc-share");
-    if (shareBtn) {
-      shareBtn.addEventListener("click", () => runBtn(shareBtn, "Sharing…", async () => {
-        let canFiles = false;
-        try { canFiles = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { canFiles = false; }
-        try {
-          if (canFiles) {
-            await navigator.share({ files: [file], title: "My Beyblade X Journey", text });
-          } else {
-            download();
-            await navigator.share({ title: "My Beyblade X Journey", text, url: shareUrl });
-            toast("Image downloaded — attach it in the share sheet if it doesn't already have one.");
-          }
-        } catch (err) {
-          if (err && err.name === "AbortError") return; // user closed the sheet — not an error
-          console.error(err);
-          toast(`Couldn't open the share sheet${err && err.message ? ": " + err.message : ""}. Try Download or Copy instead.`, "err");
-        }
-      }));
-    }
+    presentShareImage(box, {
+      blob,
+      fileName: `beyblade-x-stats-${today()}.png`,
+      text: sharecard.shareText(data),
+      shareUrl: location.origin + location.pathname,
+      shareTitle: "My Beyblade X Journey",
+      alt: "Your Beyblade X stats card",
+    });
   } catch (err) {
     console.error(err);
     box.innerHTML = `<p class="form-error">Couldn't build the card (${esc(err.message || "unknown error")}). Try again, or use Export my data instead.</p>`;
@@ -2700,26 +2710,46 @@ async function catalogPicker() {
 // ---------------------------------------------------------------------------
 // Decks
 // ---------------------------------------------------------------------------
+// Saved decks, plus the deck builder (state.deckDraft) — formats checked live,
+// randomizer, share links and a deck image. Rules/encoding live in decks.js.
+const RAND_SRC_KEY = "bbx.deckRandomSource";
+
+function deckCheck(d) {
+  return decks.validateDeck(d, catalogPart, { budget: state.catalog?.limitedBudget ?? null });
+}
+
+function deckComboLabel(c) {
+  return [c.blade, c.ratchet, c.bit].filter(Boolean).join(" ") || "—";
+}
+
 function renderDecks(main) {
+  if (state.deckDraft) return renderDeckBuilder(main);
   main.innerHTML = `
     <div class="view-head">
       <h1>Decks</h1>
-      <button class="btn btn-primary" id="add-deck">+ Add deck</button>
+      <button class="btn btn-primary" id="add-deck">+ Build deck</button>
     </div>
-    ${state.decks.length === 0 ? `<div class="empty">No decks yet. Build a 3-Bey deck.</div>` : `
+    ${state.decks.length === 0 ? `<div class="empty">No decks yet. Build a 3-Bey deck — pick parts with photos, check it against a format, then share it.</div>` : `
     <div class="card-list">
       ${state.decks.map((d) => {
         const used = state.matches.filter((m) => m.myDeck === d.name);
         const w = used.filter((m) => matchResult(m) === "W").length;
         const l = used.filter((m) => matchResult(m) === "L").length;
+        const combos = (d.combos || []).filter((c) => c.blade || c.ratchet || c.bit);
+        const f = decks.formatOf(d.format);
+        const check = state.catalog ? deckCheck({ ...d, combos }) : null;
         return `<article class="card">
           <div class="card-main">
             <h3>${esc(d.name)}</h3>
-            <ol class="combo-list">
-              ${(d.combos || []).filter((c) => c.blade || c.ratchet || c.bit).map((c) =>
-                `<li>${esc([c.blade, c.ratchet, c.bit].filter(Boolean).join(" "))}</li>`).join("") || "<li class='muted'>No combos set</li>"}
-            </ol>
+            <div class="deck-mini">
+              ${combos.map((c) => `<div class="deck-mini-row">
+                <span class="deck-mini-icons">${decks.PART_KEYS.map(([k, type]) => c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 24) : "").join("")}</span>
+                <span>${esc(deckComboLabel(c))}</span>
+              </div>`).join("") || `<p class="muted">No combos set</p>`}
+            </div>
             <div class="chips">
+              <span class="chip">${esc(f.label)}</span>
+              ${check && combos.length ? `<span class="chip ${check.ok ? "chip--accent" : "chip--danger"}" title="${esc(check.errors.join(" "))}">${check.ok ? "✓ legal" : `✕ ${check.errors.length} issue${check.errors.length === 1 ? "" : "s"}`}</span>` : ""}
               <span class="chip">${used.length} match${used.length === 1 ? "" : "es"}</span>
               ${used.length ? `<span class="chip chip--accent">${w}–${l}</span>` : ""}
             </div>
@@ -2727,62 +2757,533 @@ function renderDecks(main) {
           </div>
           <div class="card-actions">
             <button class="btn btn-ghost btn-sm" data-edit="${d.id}">Edit</button>
+            <button class="btn btn-ghost btn-sm" data-share="${d.id}">Share</button>
             <button class="btn btn-ghost btn-sm danger" data-del="${d.id}">Delete</button>
           </div>
         </article>`;
       }).join("")}
     </div>`}
   `;
-  $("#add-deck").addEventListener("click", () => deckForm());
+  $("#add-deck").addEventListener("click", () => openDeckBuilder());
   $$("[data-edit]", main).forEach((b) =>
-    b.addEventListener("click", () => deckForm(state.decks.find((d) => d.id === b.dataset.edit)))
+    b.addEventListener("click", () => openDeckBuilder(state.decks.find((d) => d.id === b.dataset.edit)))
+  );
+  $$("[data-share]", main).forEach((b) =>
+    b.addEventListener("click", () => shareDeckLink(state.decks.find((d) => d.id === b.dataset.share)))
   );
   $$("[data-del]", main).forEach((b) =>
     b.addEventListener("click", () => confirmDelete("decks", b.dataset.del, "deck"))
   );
+  // the legal/issues chip needs the catalog; draw again once it's in
+  if (!state.catalog && state.decks.length) {
+    catalog.loadCatalog().then((c) => { state.catalog = c; if (state.view === "decks" && !state.deckDraft) render(); }).catch(() => {});
+  }
 }
 
-function deckForm(existing, seedCombo) {
-  const combos = structuredClone(existing?.combos || (seedCombo ? [seedCombo, {}, {}] : [{}, {}, {}]));
-  while (combos.length < 3) combos.push({});
+/** Open the builder on a saved deck, a single seed combo, or a blank 3-bey deck. */
+function openDeckBuilder(existing, seed, shared) {
+  const src = shared || existing;
+  let combos = (src?.combos || []).map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "" }));
+  if (!combos.length) combos = seed ? [{ blade: seed.blade || "", ratchet: seed.ratchet || "", bit: seed.bit || "" }] : [];
+  while (combos.length < 3 && !src) combos.push({ blade: "", ratchet: "", bit: "" });
+  state.deckDraft = {
+    id: existing?.id || null,
+    name: src?.name || (seed?.blade ? `${seed.blade} deck` : ""),
+    format: decks.formatOf(src?.format).key,
+    notes: existing?.notes || "",
+    combos,
+    dirty: !!(seed || shared),
+  };
+  modal.close();
+  if (state.view !== "decks") switchView("decks"); else render();
+  scrollTo({ top: 0 });
+}
 
-  const comboSection = () => {
-    const box = document.createElement("div");
-    box.className = "combo-editor";
-    box.innerHTML = `<div class="field"><span>Combos (Blade · Ratchet · Bit)</span></div>`;
-    combos.forEach((c, i) => {
-      const row = document.createElement("div");
-      row.className = "combo-edit-row";
-      row.innerHTML = `
-        <input placeholder="Blade" value="${esc(c.blade || "")}" data-k="blade" />
-        <input placeholder="Ratchet" value="${esc(c.ratchet || "")}" data-k="ratchet" />
-        <input placeholder="Bit" value="${esc(c.bit || "")}" data-k="bit" />`;
-      const TYPE_FOR_KEY = { blade: "Blade", ratchet: "Ratchet", bit: "Bit" };
-      row.querySelectorAll("input").forEach((inp) => {
-        inp.addEventListener("input", (e) => (combos[i][e.target.dataset.k] = e.target.value.trim()));
-        attachAutocomplete(inp, () => mergedPartNames(TYPE_FOR_KEY[inp.dataset.k]));
-      });
-      box.append(row);
-    });
-    return box;
+function closeDeckBuilder() {
+  state.deckDraft = null;
+  render();
+}
+
+function randSource() {
+  try { return localStorage.getItem(RAND_SRC_KEY) === "mine" ? "mine" : "all"; } catch { return "all"; }
+}
+
+/** Parts the randomizer may use: the whole catalog, or just what you own. */
+function deckPool(source) {
+  const pool = { Blade: [], Ratchet: [], Bit: [] };
+  const parts = state.catalog?.parts || [];
+  if (source !== "mine") {
+    for (const p of parts) pool[p.type]?.push(p);
+    return pool;
+  }
+  for (const b of state.beys) {
+    if (!pool[b.type] || !b.name) continue;
+    const p = catalogPart(b.type, b.name) || { type: b.type, name: b.name, role: "", points: null, stats: null };
+    if (!pool[b.type].some((x) => x.name === p.name)) pool[b.type].push(p);
+  }
+  return pool;
+}
+
+function statBars(stats, max) {
+  return `<div class="bars deck-stats">${decks.STAT_KEYS.map(([k, label]) => `
+    <div class="bar-row">
+      <span class="bar-label">${esc(label)}</span>
+      <div class="bar"><span style="width:${Math.min(100, Math.round(((stats[k] || 0) / max) * 100))}%"></span></div>
+      <span class="bar-num">${stats[k] || 0}</span>
+    </div>`).join("")}</div>`;
+}
+
+function renderDeckBuilder(main) {
+  const d = state.deckDraft;
+  if (!state.catalog) {
+    main.innerHTML = `<div class="view-head"><h1>Deck builder</h1></div><div class="empty">Loading the parts catalog…</div>`;
+    catalog.loadCatalog()
+      .then((c) => { state.catalog = c; if (state.deckDraft) render(); })
+      .catch(() => { main.innerHTML = `<div class="view-head"><h1>Deck builder</h1></div><div class="empty">Couldn't load the parts catalog.</div>`; });
+    return;
+  }
+  const cat = state.catalog;
+  const f = decks.formatOf(d.format);
+  const check = deckCheck(d);
+  const budget = cat.limitedBudget;
+  const anyPoints = cat.parts.some((p) => p.points != null);
+  const statsFor = d.combos.map((c) => decks.comboStats(c, catalogPart));
+  const anyStats = statsFor.some(Boolean);
+  const src = randSource();
+
+  const slot = (c, i, k, type) => {
+    const name = c[k];
+    const part = name ? catalogPart(type, name) : null;
+    const dupe = name && check.dupes.has(type + "|" + name.trim().toLowerCase());
+    const metaBits = [part?.role, part?.points != null ? `${part.points} pts` : ""].filter(Boolean).join(" · ");
+    return `<button type="button" class="deck-slot${dupe ? " is-dupe" : ""}${name ? "" : " is-empty"}" data-slot="${i}|${k}">
+      ${name ? partIcon(part || { type, name }, 44) : `<span class="deck-slot-plus" aria-hidden="true">+</span>`}
+      <span class="deck-slot-main">
+        <span class="deck-slot-type">${type}</span>
+        <b>${name ? esc(name) : "Choose…"}</b>
+        ${metaBits ? `<span class="muted small">${esc(metaBits)}</span>` : ""}
+      </span>
+    </button>`;
   };
 
-  const { form, values } = buildForm([
-    { name: "name", label: "Deck name", required: true, placeholder: "Attack Aggro",
-      default: seedCombo ? `${seedCombo.blade} deck` : "" },
-    { type: "custom", render: comboSection },
-    { name: "notes", label: "Notes", type: "textarea" },
-  ], existing || {});
+  main.innerHTML = `
+    <div class="view-head">
+      <h1>${d.id ? "Edit deck" : "Build a deck"}</h1>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="db-cancel">Cancel</button>
+        <button class="btn btn-primary" id="db-save">Save deck</button>
+      </div>
+    </div>
 
-  bindSubmit(form, async () => {
-    const v = values();
-    await save("decks", existing, {
-      name: v.name.trim(),
-      combos: combos.map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "" })),
-      notes: v.notes.trim(),
-    });
+    <section class="panel deck-setup">
+      <label class="field deck-setup-name"><span>Deck name</span>
+        <input id="db-name" maxlength="60" placeholder="e.g. Attack Aggro" value="${esc(d.name)}" /></label>
+      <div class="field"><span>Beys</span>
+        <div class="stepper">
+          <button type="button" class="btn btn-ghost btn-sm" id="db-minus" aria-label="Fewer beys"${f.size || d.combos.length <= decks.MIN_BEYS ? " disabled" : ""}>−</button>
+          <b>${d.combos.length}</b>
+          <button type="button" class="btn btn-ghost btn-sm" id="db-plus" aria-label="More beys"${f.size || d.combos.length >= decks.MAX_BEYS ? " disabled" : ""}>+</button>
+        </div>
+      </div>
+      <label class="field"><span>Format</span>
+        <select id="db-format">${decks.FORMATS.map((x) => `<option value="${x.key}"${x.key === f.key ? " selected" : ""}>${esc(x.label)}</option>`).join("")}</select></label>
+      <p class="muted small deck-setup-desc">${esc(f.desc)}</p>
+    </section>
+
+    ${d.combos.map((c, i) => `
+      <section class="panel deck-combo">
+        <div class="deck-combo-head">
+          <h2>Bey ${i + 1}</h2>
+          <span class="muted small deck-combo-name">${esc(deckComboLabel(c))}</span>
+          <button type="button" class="btn btn-ghost btn-sm" data-rand="${i}">Randomize</button>
+        </div>
+        <div class="deck-slots">${decks.PART_KEYS.map(([k, type]) => slot(c, i, k, type)).join("")}</div>
+        ${statsFor[i] ? statBars(statsFor[i], cat.statMax) : ""}
+      </section>`).join("")}
+
+    <section class="panel deck-summary">
+      <h2>Lineup</h2>
+      ${check.ok
+        ? `<p class="deck-ok">✓ Legal for ${esc(f.label)}</p>`
+        : `<ul class="deck-errors">${check.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>`}
+      ${check.warnings.length ? `<ul class="deck-warnings muted small">${check.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+      ${f.limited || anyPoints ? `<p>Points: <b>${check.points.total}</b>${f.limited && budget != null ? ` / ${budget}` : ""}</p>` : ""}
+      ${anyStats ? `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Combo</th>${decks.STAT_KEYS.map(([, l]) => `<th>${esc(l)}</th>`).join("")}</tr></thead>
+        <tbody>${d.combos.map((c, i) => `<tr><td>${esc(deckComboLabel(c))}</td>${decks.STAT_KEYS.map(([k]) => `<td>${statsFor[i] ? statsFor[i][k] : "—"}</td>`).join("")}</tr>`).join("")}</tbody>
+      </table></div>` : `<p class="muted small">Stat bars appear once part stats are filled in (data/part-stats.json).</p>`}
+      <div class="deck-actions">
+        <button type="button" class="btn btn-ghost" id="db-rand-all">Randomize all</button>
+        <label class="deck-rand-src muted small">from
+          <select id="db-rand-src">
+            <option value="all"${src === "all" ? " selected" : ""}>whole catalog</option>
+            <option value="mine"${src === "mine" ? " selected" : ""}>my collection</option>
+          </select></label>
+        <span class="deck-actions-spacer"></span>
+        <button type="button" class="btn btn-ghost" id="db-share">Share link</button>
+        <button type="button" class="btn btn-ghost" id="db-image">Deck image</button>
+      </div>
+      <label class="field"><span>Notes</span><textarea id="db-notes" rows="2">${esc(d.notes)}</textarea></label>
+    </section>
+  `;
+
+  const redraw = () => { d.dirty = true; render(); };
+  $("#db-name").addEventListener("input", (e) => { d.name = e.target.value; d.dirty = true; });
+  $("#db-notes").addEventListener("input", (e) => { d.notes = e.target.value; d.dirty = true; });
+  $("#db-minus").addEventListener("click", () => { d.combos.pop(); redraw(); });
+  $("#db-plus").addEventListener("click", () => { d.combos.push({ blade: "", ratchet: "", bit: "" }); redraw(); });
+  $("#db-format").addEventListener("change", (e) => {
+    d.format = e.target.value;
+    const size = decks.formatOf(d.format).size;
+    if (size) {
+      d.combos = d.combos.slice(0, size);
+      while (d.combos.length < size) d.combos.push({ blade: "", ratchet: "", bit: "" });
+    }
+    redraw();
   });
-  modal.open(existing ? "Edit deck" : "Add deck", form);
+  $$("[data-slot]", main).forEach((b) => b.addEventListener("click", () => {
+    const [i, k] = b.dataset.slot.split("|");
+    openPartPicker(Number(i), k);
+  }));
+
+  const randomize = (only) => {
+    const source = randSource();
+    const locked = d.combos.map((_, i) => only != null && i !== only);
+    const out = decks.randomizeDeck(d, deckPool(source), { locked, budget: f.limited ? budget : null });
+    if (!out) {
+      toast(`Couldn't make a legal ${f.label} deck from ${source === "mine" ? "your collection" : "the catalog"}${source === "mine" ? " — try the whole catalog" : ""}.`, "warn");
+      return;
+    }
+    d.combos = out.combos;
+    redraw();
+  };
+  $$("[data-rand]", main).forEach((b) => b.addEventListener("click", () => randomize(Number(b.dataset.rand))));
+  $("#db-rand-all").addEventListener("click", () => randomize(null));
+  $("#db-rand-src").addEventListener("change", (e) => {
+    try { localStorage.setItem(RAND_SRC_KEY, e.target.value); } catch { /* per-viewer nicety only */ }
+  });
+
+  $("#db-share").addEventListener("click", () => shareDeckLink(d));
+  $("#db-image").addEventListener("click", () => shareDeckImage(d));
+  $("#db-cancel").addEventListener("click", () => {
+    if (d.dirty && !confirm("Discard the changes to this deck?")) return;
+    closeDeckBuilder();
+  });
+  $("#db-save").addEventListener("click", async () => {
+    const name = d.name.trim();
+    if (!name) { toast("Give the deck a name first.", "warn"); $("#db-name").focus(); return; }
+    const existing = d.id ? state.decks.find((x) => x.id === d.id) : null;
+    state.deckDraft = null;
+    const ok = await save("decks", existing, {
+      name,
+      format: d.format,
+      combos: d.combos.map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "" })),
+      notes: d.notes.trim(),
+    });
+    if (!ok) { state.deckDraft = d; render(); }
+  });
+}
+
+/** Choose a part for one slot: catalog parts (photos, roles, owned) plus your own custom names. */
+function openPartPicker(i, k) {
+  const d = state.deckDraft;
+  const type = { blade: "Blade", ratchet: "Ratchet", bit: "Bit" }[k];
+  const key = (n) => String(n || "").trim().toLowerCase();
+  const usedIn = new Map();
+  d.combos.forEach((c, j) => { if (j !== i && c[k]) usedIn.set(key(c[k]), j + 1); });
+  const owns = (n) => state.beys.some((b) => b.type === type && partKey(b.name) === partKey(n));
+
+  const all = [...(state.catalog?.parts || []).filter((p) => p.type === type)];
+  for (const b of state.beys) {
+    if (b.type === type && b.name && !catalogPart(type, b.name) && !all.some((p) => key(p.name) === key(b.name))) {
+      all.push({ type, name: b.name, role: "", points: null, stats: null, custom: true });
+    }
+  }
+  all.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  const f = { q: "", role: "", owned: false };
+  const box = document.createElement("div");
+  box.className = "catalog-picker";
+  box.innerHTML = `
+    <div class="catalog-controls">
+      <input type="search" id="pp-q" placeholder="Search ${type.toLowerCase()}s…" autocomplete="off" />
+      <div class="catalog-chips" id="pp-chips"></div>
+    </div>
+    <div class="catalog-results" id="pp-results"></div>
+    <div class="catalog-foot">
+      <span class="muted small" id="pp-count"></span>
+      ${d.combos[i][k] ? `<button type="button" class="btn btn-ghost btn-sm" id="pp-clear">Clear slot</button>` : ""}
+    </div>`;
+  const chips = box.querySelector("#pp-chips");
+  const results = box.querySelector("#pp-results");
+
+  const choose = (name) => {
+    d.combos[i][k] = name;
+    d.dirty = true;
+    modal.close();
+    render();
+  };
+
+  const draw = () => {
+    const roles = type === "Ratchet" ? [] : ["Attack", "Stamina", "Defense", "Balance"];
+    chips.innerHTML = [
+      `<button type="button" class="chip-btn${!f.role && !f.owned ? " is-active" : ""}" data-r="">All</button>`,
+      ...roles.map((r) => `<button type="button" class="chip-btn${f.role === r ? " is-active" : ""}" data-r="${r}">${r}</button>`),
+      `<button type="button" class="chip-btn${f.owned ? " is-active" : ""}" data-owned>Owned</button>`,
+    ].join("");
+    const q = f.q.trim().toLowerCase();
+    const list = all.filter((p) =>
+      (!q || p.name.toLowerCase().includes(q)) && (!f.role || p.role === f.role) && (!f.owned || owns(p.name)));
+    const exact = all.some((p) => key(p.name) === key(f.q));
+    results.innerHTML = (list.map((p) => {
+      const inBey = usedIn.get(key(p.name));
+      const sel = key(d.combos[i][k]) === key(p.name);
+      const metaLine = [p.role, p.points != null ? `${p.points} pts` : "", p.custom ? "not in catalog" : ""].filter(Boolean).join(" · ");
+      const tag = sel ? "✓" : inBey ? `Bey ${inBey}` : owns(p.name) ? "Owned" : "";
+      return `<button type="button" class="catalog-card${sel ? " is-picked" : ""}${inBey ? " is-owned" : ""}" data-name="${esc(p.name)}"${inBey ? ` disabled title="Already used in bey ${inBey}"` : ""}>
+        ${partIcon(p, 38)}
+        <span class="catalog-card-main"><b>${esc(p.name)}</b><span class="muted small">${esc(metaLine || type)}</span></span>
+        <span class="catalog-card-tag">${tag}</span>
+      </button>`;
+    }).join("") || `<p class="muted">No ${type.toLowerCase()}s match.</p>`) +
+      (f.q.trim() && !exact ? `<button type="button" class="btn btn-ghost btn-sm pp-custom" id="pp-custom">Use “${esc(f.q.trim())}”</button>` : "");
+    box.querySelector("#pp-count").textContent = `${list.length} ${type.toLowerCase()}${list.length === 1 ? "" : "s"}`;
+    results.querySelectorAll("[data-name]").forEach((el) => el.addEventListener("click", () => choose(el.dataset.name)));
+    results.querySelector("#pp-custom")?.addEventListener("click", () => choose(f.q.trim().slice(0, 40)));
+  };
+
+  box.querySelector("#pp-q").addEventListener("input", (e) => { f.q = e.target.value; draw(); });
+  chips.addEventListener("click", (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    if (b.hasAttribute("data-owned")) f.owned = !f.owned;
+    else { f.role = b.dataset.r; if (!f.role) f.owned = false; }
+    draw();
+  });
+  box.querySelector("#pp-clear")?.addEventListener("click", () => choose(""));
+  draw();
+  modal.open(`Bey ${i + 1} — choose a ${type.toLowerCase()}`, box);
+  setTimeout(() => box.querySelector("#pp-q").focus(), 50);
+}
+
+// ---- share link ------------------------------------------------------------
+
+function deckShareUrl(d) {
+  return location.origin + location.pathname + "?deck=" + decks.encodeDeck(d);
+}
+
+function shareDeckLink(d) {
+  if (!d) return;
+  const url = deckShareUrl(d);
+  const box = document.createElement("div");
+  box.className = "entry-form";
+  box.innerHTML = `
+    <p class="muted small">Anyone with this link sees the deck with its photos and format check, and can save a copy once signed in.</p>
+    <input type="text" readonly value="${esc(url)}" id="ds-url" />
+    <div class="form-actions">
+      ${navigator.share ? `<button type="button" class="btn btn-ghost" id="ds-native">Share…</button>` : ""}
+      <button type="button" class="btn btn-primary" id="ds-copy">Copy link</button>
+    </div>`;
+  const input = box.querySelector("#ds-url");
+  input.addEventListener("focus", () => input.select());
+  box.querySelector("#ds-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(url); toast("Link copied."); }
+    catch { input.focus(); input.select(); toast("Press Ctrl+C (or ⌘C) to copy.", "warn"); }
+  });
+  box.querySelector("#ds-native")?.addEventListener("click", async () => {
+    try { await navigator.share({ title: d.name || "Beyblade X deck", text: d.combos.map(deckComboLabel).join(" / "), url }); }
+    catch (err) { if (err?.name !== "AbortError") toast("Couldn't open the share sheet — copy the link instead.", "err"); }
+  });
+  modal.open(`Share ${d.name ? "“" + d.name + "”" : "deck"}`, box);
+}
+
+/** A deck someone shared (?deck=…): read-only preview with photos + format check. */
+function sharedDeckPreview(shared, { signedIn }) {
+  const box = document.createElement("div");
+  box.className = "bey-detail";
+  const draw = () => {
+    const f = decks.formatOf(shared.format);
+    const check = state.catalog ? deckCheck(shared) : null;
+    box.innerHTML = `
+      <p class="muted small">${esc(f.label)} · ${shared.combos.length} bey${shared.combos.length === 1 ? "" : "s"}
+        ${check ? (check.ok ? " · <b class=\"deck-ok\">✓ legal</b>" : ` · <b class="danger-text">✕ ${check.errors.length} issue${check.errors.length === 1 ? "" : "s"}</b>`) : ""}</p>
+      ${shared.combos.map((c, i) => `<div class="deck-preview-row">
+        <span class="rank-num">${i + 1}</span>
+        ${decks.PART_KEYS.map(([k, type]) => `<span class="deck-preview-part">
+          ${c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 44) : ""}
+          <span class="small">${esc(c[k] || "—")}</span>
+        </span>`).join("")}
+      </div>`).join("")}
+      <div class="form-actions">
+        ${signedIn
+          ? `<button type="button" class="btn btn-primary" id="sd-open">Open in deck builder</button>`
+          : `<button type="button" class="btn btn-primary" id="sd-signin">Sign in to save a copy</button>`}
+      </div>`;
+    box.querySelector("#sd-open")?.addEventListener("click", () => openDeckBuilder(null, null, shared));
+    box.querySelector("#sd-signin")?.addEventListener("click", () => { modal.close(); showAuth("signin"); });
+  };
+  draw();
+  modal.open(shared.name || "Shared deck", box);
+  if (!state.catalog) catalog.loadCatalog().then((c) => { state.catalog = c; draw(); }).catch(() => {});
+}
+
+// A ?deck= link: decode it once at startup, drop it from the address bar,
+// and keep it for the session so it survives signing in.
+const SHARED_DECK_KEY = "bbx.sharedDeck";
+function takeSharedDeck() {
+  const params = new URLSearchParams(location.search);
+  const raw = params.get("deck");
+  if (raw) {
+    params.delete("deck");
+    const qs = params.toString();
+    history.replaceState(null, "", location.pathname + (qs ? "?" + qs : "") + location.hash);
+    try { sessionStorage.setItem(SHARED_DECK_KEY, raw); } catch { /* fine, we still have it now */ }
+    return decks.decodeDeck(raw);
+  }
+  try { return decks.decodeDeck(sessionStorage.getItem(SHARED_DECK_KEY) || ""); } catch { return null; }
+}
+function forgetSharedDeck() {
+  try { sessionStorage.removeItem(SHARED_DECK_KEY); } catch { /* ignore */ }
+}
+
+// ---- deck image -------------------------------------------------------------
+
+function drawContain(ctx, img, x, y, w, h) {
+  const s = Math.min(w / img.naturalWidth, h / img.naturalHeight);
+  const dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
+async function partImageEl(type, name) {
+  const part = catalogPart(type, name);
+  if (part?.image) {
+    try { return await withTimeout(loadImageEl(part.image), 4000, null); } catch { /* fall back to the icon */ }
+  }
+  const svg = partSvg(part || { type, name }, 160).replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+  try { return await loadImageEl("data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg)); } catch { return null; }
+}
+
+async function drawDeckImage(d) {
+  const W = 1080, PAD = 56, HEAD = 210, ROW = 270, FOOT = 96;
+  const combos = d.combos;
+  const H = HEAD + combos.length * ROW + FOOT;
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  await ensureShareFontsLoaded();
+
+  ctx.fillStyle = SHARE_COLORS.bg;
+  ctx.fillRect(0, 0, W, H);
+  let g = ctx.createRadialGradient(160, 40, 0, 160, 40, 620);
+  g.addColorStop(0, "rgba(189,236,63,.10)"); g.addColorStop(1, "rgba(189,236,63,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  g = ctx.createRadialGradient(W - 120, 0, 0, W - 120, 0, 620);
+  g.addColorStop(0, "rgba(56,198,232,.13)"); g.addColorStop(1, "rgba(56,198,232,0)");
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+  const f = decks.formatOf(d.format);
+  const check = deckCheck(d);
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = SHARE_COLORS.text;
+  ctx.font = '700 56px "Chakra Petch"';
+  ctx.fillText(shareTruncate(ctx, (d.name || "My deck").toUpperCase(), W - PAD * 2), PAD, PAD + 52);
+  ctx.font = '600 24px "Inter"';
+  ctx.fillStyle = SHARE_COLORS.muted;
+  const sub = [`${f.label} format`, `${combos.length} bey${combos.length === 1 ? "" : "s"}`,
+    check.points.total ? `${check.points.total} pts` : "", check.ok ? "✓ legal" : ""].filter(Boolean).join("  ·  ");
+  ctx.fillText(sub, PAD, PAD + 98);
+  ctx.fillStyle = shareSplitGradient(ctx, PAD, 0, W - PAD, 0);
+  ctx.fillRect(PAD, HEAD - 44, W - PAD * 2, 4);
+
+  const statsFor = combos.map((c) => decks.comboStats(c, catalogPart));
+  const anyStats = statsFor.some(Boolean);
+  const statMax = state.catalog?.statMax || 150;
+  const partsW = anyStats ? 640 : W - PAD * 2 - 90;
+
+  for (let i = 0; i < combos.length; i++) {
+    const c = combos[i];
+    const y0 = HEAD + i * ROW;
+    shareNotchPath(ctx, PAD, y0, W - PAD * 2, ROW - 26, 18);
+    ctx.fillStyle = SHARE_COLORS.panel2; ctx.fill();
+    ctx.strokeStyle = SHARE_COLORS.line; ctx.lineWidth = 2; ctx.stroke();
+
+    ctx.fillStyle = SHARE_COLORS.accent;
+    ctx.font = 'italic 700 54px "Chakra Petch"';
+    ctx.textAlign = "center";
+    ctx.fillText(String(i + 1), PAD + 46, y0 + 72);
+
+    const colW = partsW / 3;
+    const x0 = PAD + 90;
+    for (let p = 0; p < 3; p++) {
+      const [k, type] = decks.PART_KEYS[p];
+      const cx = x0 + colW * p;
+      if (c[k]) {
+        const img = await partImageEl(type, c[k]);
+        if (img) drawContain(ctx, img, cx + (colW - 140) / 2, y0 + 22, 140, 140);
+      }
+      ctx.textAlign = "center";
+      ctx.fillStyle = SHARE_COLORS.muted;
+      ctx.font = '600 18px "Inter"';
+      ctx.fillText(type.toUpperCase(), cx + colW / 2, y0 + 190);
+      ctx.fillStyle = SHARE_COLORS.text;
+      ctx.font = '700 26px "Chakra Petch"';
+      ctx.fillText(shareTruncate(ctx, c[k] || "—", colW - 16), cx + colW / 2, y0 + 222);
+    }
+
+    if (statsFor[i]) {
+      const sx = PAD + 90 + partsW + 24, sw = W - PAD - 28 - sx;
+      decks.STAT_KEYS.forEach(([k, label], r) => {
+        const yy = y0 + 40 + r * 38;
+        ctx.textAlign = "left";
+        ctx.fillStyle = SHARE_COLORS.muted;
+        ctx.font = '600 16px "Inter"';
+        ctx.fillText(label.toUpperCase(), sx, yy);
+        ctx.textAlign = "right";
+        ctx.fillStyle = SHARE_COLORS.text;
+        ctx.font = '700 18px "Chakra Petch"';
+        ctx.fillText(String(statsFor[i][k] || 0), sx + sw, yy);
+        ctx.fillStyle = SHARE_COLORS.panel;
+        ctx.fillRect(sx, yy + 8, sw, 8);
+        ctx.fillStyle = shareSplitGradient(ctx, sx, 0, sx + sw, 0);
+        ctx.fillRect(sx, yy + 8, sw * Math.min(1, (statsFor[i][k] || 0) / statMax), 8);
+      });
+    }
+  }
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = SHARE_COLORS.text;
+  ctx.font = '700 22px "Chakra Petch"';
+  ctx.fillText("BEYBLADE X JOURNEY", PAD, H - 40);
+  ctx.textAlign = "right";
+  ctx.fillStyle = SHARE_COLORS.muted;
+  ctx.font = '500 20px "Inter"';
+  ctx.fillText(location.host + location.pathname.replace(/\/$/, ""), W - PAD, H - 40);
+  return canvas;
+}
+
+async function shareDeckImage(d) {
+  const box = document.createElement("div");
+  box.className = "share-card-modal";
+  box.innerHTML = `<p class="muted">Drawing your deck…</p>`;
+  modal.open("Deck image", box);
+  try {
+    const canvas = await withTimeout(drawDeckImage(d), 15000, null);
+    if (!canvas) throw new Error("Timed out drawing the deck");
+    const blob = await withTimeout(new Promise((resolve) => canvas.toBlob(resolve, "image/png")), 5000, null);
+    if (!blob) throw new Error("Couldn't export the image");
+    const slug = catalog.slugify(d.name || "deck") || "deck";
+    presentShareImage(box, {
+      blob,
+      fileName: `beyblade-x-${slug}.png`,
+      text: `${d.name || "My Beyblade X deck"}: ${d.combos.map(deckComboLabel).join(" / ")}`,
+      shareUrl: deckShareUrl(d),
+      shareTitle: d.name || "My Beyblade X deck",
+      alt: `Deck image for ${d.name || "this deck"}`,
+    });
+  } catch (err) {
+    console.error(err);
+    box.innerHTML = `<p class="form-error">Couldn't draw the deck image (${esc(err.message || "unknown error")}).</p>`;
+  }
 }
 
 /** Known names for a part type: your own collection first, then the canonical meta list — deduped, case-insensitive. */
@@ -3040,7 +3541,7 @@ function metaCombosPanel(panel) {
 
   $$("[data-deck]", panel).forEach((b) =>
     b.addEventListener("click", () => {
-      try { deckForm(null, JSON.parse(b.dataset.deck)); } catch { deckForm(); }
+      try { openDeckBuilder(null, JSON.parse(b.dataset.deck)); } catch { openDeckBuilder(); }
     })
   );
 }
@@ -3870,7 +4371,7 @@ async function save(coll, existing, data) {
   } catch (err) {
     console.error(err);
     toast(err.message || "Could not save.", "err");
-    return;
+    return false;
   }
 
   patchLocalDoc(coll, id, data, isNew);
@@ -3885,6 +4386,7 @@ async function save(coll, existing, data) {
   write
     .then(() => refresh().then(render))
     .catch((err) => toast("A change didn't sync: " + (err.message || err), "err"));
+  return true;
 }
 
 /** Add a feed item when a new match / placed tournament is logged. Best-effort. */
@@ -3965,9 +4467,11 @@ function today() {
 // ---------------------------------------------------------------------------
 initAuthUi();
 initShell();
+state.sharedDeck = takeSharedDeck();
 
 if (!isConfigured) {
   showLanding();
+  if (state.sharedDeck) sharedDeckPreview(state.sharedDeck, { signedIn: false });
 } else {
   onAuthStateChanged(auth, async (user) => {
     $("#app-loading").hidden = true;
@@ -3986,11 +4490,18 @@ if (!isConfigured) {
       }
       syncProfileChrome();
       render();
+      if (state.sharedDeck) {
+        sharedDeckPreview(state.sharedDeck, { signedIn: true });
+        state.sharedDeck = null;
+        forgetSharedDeck();
+      }
     } else {
       state.loaded = false;
+      state.deckDraft = null;
       $("#shell").hidden = true;
       // keep the auth card up if the user was mid sign-in, else show landing
       if ($("#auth-view").hidden) showLanding();
+      if (state.sharedDeck) sharedDeckPreview(state.sharedDeck, { signedIn: false });
     }
   });
 }
