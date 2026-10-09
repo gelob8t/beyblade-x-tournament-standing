@@ -1,6 +1,6 @@
 {
-  "updated": "2026-10-07",
-  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B, Dragoon Storm, Hells Nether, Wyvern Hover, Mummy Curse, Tyranno Roar, Bahamut Blitz, plus ratchets 8-80, 7-55, 6-60, 6-80 and 1-50 and bits Zap, Jolt and Ignition). `ratchetIntegrated: true` marks a blade with a built-in ratchet (its combos have no separate ratchet). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
+  "updated": "2026-10-09",
+  "note": "Beyblade X parts catalog for the collection picker. Name roster cross-referenced against beybxdb.com's parts guide (Sep 2026) plus a few extra confirmed bits it didn't list (Kick, Vortex, Wedge) and blades reported directly by users that aren't on that site yet (Glory Valkyrie, Sol Eclipse, Bullet Griffon, Dran Brave S, Perseus Dark B, Dragoon Storm, Hells Nether, Wyvern Hover, Mummy Curse, Tyranno Roar, Bahamut Blitz, Clock Mirage, plus ratchets 8-80, 7-55, 6-60, 6-80, 1-50 and 9-65 and bits Zap, Jolt and Ignition). `ratchetIntegrated: true` marks a blade with a built-in ratchet (its combos have no separate ratchet). `system` (BX/UX/CX), `role` and `spin` are best-effort throughout — a blank `role`/`spin` means genuinely unconfirmed rather than guessed. Community-maintained — send a PR to add a part or fix a detail. Role colours: Attack = red-orange, Stamina = teal, Defense = amber, Balance = violet.",
   "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.webp. WebP is strongly recommended over PNG/JPG for these — typically 8-15x smaller at the same visual quality, which is most of why the catalog loads fast. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
   "imageBase": "./assets/parts/",
   "imageExt": ".webp",
@@ -62,6 +62,7 @@
     { "name": "Mummy Curse", "system": "CX", "role": "Defense", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. Defense type (per user); system best-effort from the photo (CX-style lock chip)." },
     { "name": "Tyranno Roar", "system": "CX", "role": "Attack", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. Attack type (per user); Tyranno-family (cf. Tyranno Beat); system best-effort from the photo (CX-style lock chip)." },
     { "name": "Bahamut Blitz", "system": "CX", "role": "", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. System best-effort from the photo (CX-style lock chip); role unconfirmed." },
+    { "name": "Clock Mirage", "system": "CX", "role": "", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. System best-effort from the photo (CX-style lock chip); role unconfirmed." },
     { "name": "Wyvern Hover", "system": "CX", "role": "Balance", "spin": "Right", "note": "User-reported; not yet on beybxdb.com. Wyvern-family (cf. Wyvern Gale); system/role best-effort, unconfirmed." },
     { "name": "Xeno Xcalibur", "system": "CX", "role": "", "spin": "Right", "note": "CX blade; role unconfirmed." },
     { "name": "Ghost Circle", "system": "CX", "role": "", "spin": "Right", "note": "Burst-legacy CX crossover; role unconfirmed." },
@@ -97,6 +98,7 @@
     { "name": "7-80", "peaks": 7, "height": 80, "note": "Tall with dense grip." },
     { "name": "8-80", "peaks": 8, "height": 80, "note": "Tall with dense grip (8 contact points). User-reported; not yet on beybxdb.com." },
     { "name": "9-60", "peaks": 9, "height": 60, "note": "Low + 9 protrusions; great grip and stability for attack/balance." },
+    { "name": "9-65", "peaks": 9, "height": 65, "note": "Low-mid height with 9 protrusions. User-reported; not yet on beybxdb.com." },
     { "name": "9-70", "peaks": 9, "height": 70, "note": "Mid-tall stamina base with grip." },
     { "name": "9-80", "peaks": 9, "height": 80, "note": "Tall with dense grip." }
   ],
