@@ -113,6 +113,7 @@
     "Free Ball": { "points": null, "atk": 10, "def": 25, "sta": 60, "xd": 5, "br": 30 },
     "Disc Ball": { "points": null, "atk": 15, "def": 20, "sta": 55, "xd": 10, "br": 30 },
     "Orb": { "points": null, "atk": 10, "def": 30, "sta": 50, "xd": 10, "br": 30 },
+    "Low Orb": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Point": { "points": null, "atk": 25, "def": 25, "sta": 25, "xd": 25, "br": 80 },
     "Gear Point": { "points": null, "atk": 30, "def": 25, "sta": 15, "xd": 30, "br": 80 },
     "Trans Point": { "points": null, "atk": 35, "def": 25, "sta": 25, "xd": 15, "br": 80 },
