@@ -56,6 +56,7 @@
     "Bahamut Blitz": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Clock Mirage": { "points": null, "atk": 10, "def": 10, "sta": 80, "xd": null, "br": null },
     "Shark Scale": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
+    "Meteor Dragoon": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Wyvern Hover": { "points": null, "atk": 13, "def": 60, "sta": 27, "xd": null, "br": null },
     "Xeno Xcalibur": { "points": null, "atk": 65, "def": 25, "sta": 10, "xd": null, "br": null },
     "Ghost Circle": { "points": null, "atk": 15, "def": 20, "sta": 65, "xd": null, "br": null },
