@@ -2824,13 +2824,54 @@ function deckPool(source) {
   return pool;
 }
 
-function statBars(stats, max) {
-  return `<div class="bars deck-stats">${decks.STAT_KEYS.map(([k, label]) => `
-    <div class="bar-row">
+// Stat bars render at their previous values (`prev`, or 0 for a bey that had
+// none) and animateStatBars() then slides them to the new ones, with a
+// short-lived +n / -n badge on each stat that changed.
+function statBars(stats, max, prev) {
+  const pct = (v) => Math.min(100, Math.round(((v || 0) / max) * 100));
+  return `<div class="bars deck-stats">${decks.STAT_KEYS.map(([k, label]) => {
+    const to = stats[k] || 0;
+    const from = prev ? prev[k] || 0 : 0;
+    const delta = prev ? to - from : 0;
+    return `<div class="bar-row">
       <span class="bar-label">${esc(label)}</span>
-      <div class="bar"><span style="width:${Math.min(100, Math.round(((stats[k] || 0) / max) * 100))}%"></span></div>
-      <span class="bar-num">${stats[k] || 0}</span>
-    </div>`).join("")}</div>`;
+      <div class="bar"><span style="width:${pct(from)}%" data-to="${pct(to)}"></span></div>
+      <span class="bar-num" data-from="${from}" data-to="${to}">${from}${delta ? `<span class="stat-delta ${delta > 0 ? "is-up" : "is-down"}">${delta > 0 ? "+" : "−"}${Math.abs(delta)}</span>` : ""}</span>
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function animateStatBars(root) {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const nums = $$(".deck-stats .bar-num[data-to]", root);
+  const setNum = (el, v) => {
+    const badge = el.querySelector(".stat-delta");
+    el.textContent = String(v);
+    if (badge) el.append(badge);
+  };
+  if (reduce) {
+    $$(".deck-stats .bar > span[data-to]", root).forEach((b) => (b.style.width = b.dataset.to + "%"));
+    nums.forEach((el) => setNum(el, Number(el.dataset.to)));
+    return;
+  }
+  // two frames so the old width is painted before the transition starts
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $$(".deck-stats .bar > span[data-to]", root).forEach((b) => (b.style.width = b.dataset.to + "%"));
+  }));
+  const moving = nums.filter((el) => el.dataset.from !== el.dataset.to);
+  if (!moving.length) return;
+  const DUR = 450, t0 = performance.now();
+  const step = (now) => {
+    const t = Math.min(1, (now - t0) / DUR);
+    const ease = 1 - Math.pow(1 - t, 3);
+    for (const el of moving) {
+      if (!el.isConnected) continue;
+      const a = Number(el.dataset.from), b = Number(el.dataset.to);
+      setNum(el, Math.round(a + (b - a) * ease));
+    }
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 function renderDeckBuilder(main) {
@@ -2908,7 +2949,7 @@ function renderDeckBuilder(main) {
           <button type="button" class="btn btn-ghost btn-sm" data-rand="${i}">Randomize</button>
         </div>
         <div class="deck-slots">${decks.PART_KEYS.map(([k, type]) => slot(c, i, k, type)).join("")}</div>
-        ${statsFor[i] ? statBars(statsFor[i], cat.statMax) : ""}
+        ${statsFor[i] ? statBars(statsFor[i], cat.statMax, (d.prevStats || [])[i]) : ""}
       </section>`).join("")}
 
     <section class="panel deck-summary">
@@ -2936,6 +2977,9 @@ function renderDeckBuilder(main) {
       <label class="field"><span>Notes</span><textarea id="db-notes" rows="2">${esc(d.notes)}</textarea></label>
     </section>
   `;
+
+  animateStatBars(main);
+  d.prevStats = statsFor;
 
   const redraw = () => { d.dirty = true; render(); };
   $("#db-name").addEventListener("input", (e) => { d.name = e.target.value; d.dirty = true; });
