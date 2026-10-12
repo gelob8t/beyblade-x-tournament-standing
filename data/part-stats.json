@@ -120,6 +120,7 @@
     "Under Needle": { "points": null, "atk": 10, "def": 60, "sta": 20, "xd": 10, "br": 30 },
     "Metal Needle": { "points": null, "atk": 8, "def": 57, "sta": 30, "xd": 5, "br": 30 },
     "Zap": { "points": null, "atk": 30, "def": 20, "sta": 15, "xd": 35, "br": 80 },
+    "Narrow": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Ignition": { "points": null, "atk": 50, "def": 15, "sta": 5, "xd": 30, "br": 80 },
     "Jolt": { "points": null, "atk": 35, "def": 10, "sta": 15, "xd": 40, "br": 80 },
     "Gear Needle": { "points": null, "atk": 20, "def": 40, "sta": 10, "xd": 30, "br": 30 },
