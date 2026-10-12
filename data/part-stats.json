@@ -55,6 +55,7 @@
     "Tyranno Roar": { "points": null, "atk": 55, "def": 35, "sta": 30, "xd": null, "br": null },
     "Bahamut Blitz": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Clock Mirage": { "points": null, "atk": 10, "def": 10, "sta": 80, "xd": null, "br": null },
+    "Shark Scale": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Wyvern Hover": { "points": null, "atk": 13, "def": 60, "sta": 27, "xd": null, "br": null },
     "Xeno Xcalibur": { "points": null, "atk": 65, "def": 25, "sta": 10, "xd": null, "br": null },
     "Ghost Circle": { "points": null, "atk": 15, "def": 20, "sta": 65, "xd": null, "br": null },
@@ -76,6 +77,7 @@
     "3-70": { "points": null, "atk": 15, "def": 8, "sta": 7, "xd": null, "br": null },
     "3-80": { "points": null, "atk": 15, "def": 7, "sta": 8, "xd": null, "br": null },
     "3-85": { "points": null, "atk": 15, "def": 7, "sta": 8, "xd": null, "br": null },
+    "4-50": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "4-60": { "points": null, "atk": 11, "def": 13, "sta": 6, "xd": null, "br": null },
     "4-70": { "points": null, "atk": 11, "def": 12, "sta": 7, "xd": null, "br": null },
     "4-80": { "points": null, "atk": 11, "def": 11, "sta": 8, "xd": null, "br": null },
@@ -96,6 +98,7 @@
   },
   "Bit": {
     "Flat": { "points": null, "atk": 40, "def": 10, "sta": 10, "xd": 40, "br": 80 },
+    "Under Flat": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Low Flat": { "points": null, "atk": 45, "def": 10, "sta": 5, "xd": 45, "br": 80 },
     "Rush": { "points": null, "atk": 35, "def": 15, "sta": 10, "xd": 45, "br": 80 },
     "Low Rush": { "points": null, "atk": 45, "def": 5, "sta": 15, "xd": 35, "br": 8 },
