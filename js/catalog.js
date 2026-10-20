@@ -47,6 +47,7 @@ export async function loadCatalog() {
         height: p.height ?? null,
         peaks: p.peaks ?? null,
         ratchetIntegrated: !!p.ratchetIntegrated, // blade with a built-in ratchet
+        modes: Array.isArray(p.modes) ? p.modes.map((m) => String(m).trim()).filter(Boolean) : [], // first = default
         note: p.note || "",
         // explicit URL wins; otherwise derive one from imageBase + slug
         image: p.image || (base && slug ? base + slug + ext : ""),
@@ -83,7 +84,8 @@ const STAT_FIELDS = ["atk", "def", "sta", "xd", "br"];
 /**
  * Copy points/stats from data/part-stats.json ({ Blade: { name: {...} } })
  * onto catalog parts, in place. Names match ignoring case; only real numbers
- * are kept, so `stats` is null until at least one stat is filled in.
+ * are kept, so `stats` is null until at least one stat is filled in. A part
+ * with per-mode stats also gets `modeStats` ({ mode: stats }).
  */
 export function applyPartStats(parts, raw) {
   const byType = {};
@@ -93,9 +95,21 @@ export function applyPartStats(parts, raw) {
   for (const p of parts) {
     const v = byType[p.type]?.get(p.name.toLowerCase()) || {};
     p.points = typeof v.points === "number" ? v.points : null;
-    const stats = {};
-    for (const k of STAT_FIELDS) if (typeof v[k] === "number") stats[k] = v[k];
-    p.stats = Object.keys(stats).length ? stats : null;
+    const pickStats = (o) => {
+      const s = {};
+      for (const k of STAT_FIELDS) if (o && typeof o[k] === "number") s[k] = o[k];
+      return Object.keys(s).length ? s : null;
+    };
+    // a blade with modes: { modes: { Normal: {...}, Low: {...} } }; its plain
+    // `stats` are the default (first) mode's, falling back to the base fields
+    p.modeStats = null;
+    if (v.modes && typeof v.modes === "object") {
+      const ms = {};
+      for (const [m, o] of Object.entries(v.modes)) { const s = pickStats(o); if (s) ms[m] = s; }
+      if (Object.keys(ms).length) p.modeStats = ms;
+    }
+    const firstMode = (p.modes && p.modes[0]) || (p.modeStats && Object.keys(p.modeStats)[0]);
+    p.stats = (p.modeStats && p.modeStats[firstMode]) || pickStats(v);
   }
   return parts;
 }

@@ -2,7 +2,8 @@
 // and the randomizer. Pure functions only (no DOM, no Firebase) so they're
 // unit-tested in test/decks.test.mjs.
 //
-// A deck is { name, format, combos: [{ blade, ratchet, bit }] }.
+// A deck is { name, format, combos: [{ blade, ratchet, bit, mode? }] } —
+// `mode` only matters for a blade with modes (e.g. Hells Nether Normal/Low).
 // `lookup(type, name)` returns the catalog part ({ role, points, stats }) or
 // null for a part that isn't in the catalog.
 
@@ -42,12 +43,21 @@ export function ratchetIntegrated(combo, lookup) {
   return !!(combo && combo.blade && lookup("Blade", combo.blade)?.ratchetIntegrated);
 }
 
+/** The blade's active mode: the combo's `mode` if valid, else the default (first); "" for no modes. */
+export function comboMode(combo, lookup) {
+  const modes = (combo && combo.blade && lookup("Blade", combo.blade)?.modes) || [];
+  if (!modes.length) return "";
+  return modes.includes(combo.mode) ? combo.mode : modes[0];
+}
+
 /** Summed stats for one combo, or null when none of its parts has stats. */
 export function comboStats(combo, lookup) {
   const out = Object.fromEntries(STAT_KEYS.map(([k]) => [k, 0]));
   let any = false;
   for (const [k, type] of PART_KEYS) {
-    const s = combo && combo[k] ? lookup(type, combo[k])?.stats : null;
+    const part = combo && combo[k] ? lookup(type, combo[k]) : null;
+    const mode = k === "blade" ? comboMode(combo, lookup) : "";
+    const s = (mode && part?.modeStats?.[mode]) || part?.stats || null;
     if (!s) continue;
     for (const [sk] of STAT_KEYS) {
       if (typeof s[sk] === "number") { out[sk] += s[sk]; any = true; }
@@ -155,7 +165,7 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
 
 // ---- share links ----------------------------------------------------------
 // The deck goes in the URL as base64url(JSON) of a compact shape:
-//   { n: name, f: format, c: [[blade, ratchet, bit], ...] }
+//   { n: name, f: format, c: [[blade, ratchet, bit, mode?], ...] }
 
 const MAX_NAME = 60;
 const MAX_PART = 40;
@@ -177,7 +187,8 @@ export function encodeDeck(deck) {
   const compact = {
     n: String(deck.name || "").slice(0, MAX_NAME),
     f: formatOf(deck.format).key,
-    c: (deck.combos || []).slice(0, MAX_BEYS).map((c) => [c.blade || "", c.ratchet || "", c.bit || ""]),
+    c: (deck.combos || []).slice(0, MAX_BEYS).map((c) =>
+      c.mode ? [c.blade || "", c.ratchet || "", c.bit || "", c.mode] : [c.blade || "", c.ratchet || "", c.bit || ""]),
   };
   return b64urlEncode(JSON.stringify(compact));
 }
@@ -190,7 +201,9 @@ export function decodeDeck(s) {
     const clip = (v, n) => String(v ?? "").trim().slice(0, n);
     const combos = o.c.slice(0, MAX_BEYS).map((row) => {
       const r = Array.isArray(row) ? row : [];
-      return { blade: clip(r[0], MAX_PART), ratchet: clip(r[1], MAX_PART), bit: clip(r[2], MAX_PART) };
+      const combo = { blade: clip(r[0], MAX_PART), ratchet: clip(r[1], MAX_PART), bit: clip(r[2], MAX_PART) };
+      if (r[3]) combo.mode = clip(r[3], 20);
+      return combo;
     });
     if (!combos.length) return null;
     return { name: clip(o.n, MAX_NAME), format: formatOf(o.f).key, combos };
@@ -255,7 +268,10 @@ export function randomizeDeck(deck, pool, { locked = [], budget = null, rng = Ma
       const blade = choose("Blade", role);
       const ratchet = blade && lookup("Blade", blade)?.ratchetIntegrated ? "" : choose("Ratchet");
       const bit = choose("Bit", role);
-      return { blade: blade || "", ratchet: ratchet || "", bit: bit || "" };
+      const modes = (blade && lookup("Blade", blade)?.modes) || [];
+      const out = { blade: blade || "", ratchet: ratchet || "", bit: bit || "" };
+      if (modes.length > 1) out.mode = pick(modes, rng);
+      return out;
     });
 
     const candidate = { ...deck, combos: out };

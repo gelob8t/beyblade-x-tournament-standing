@@ -76,3 +76,10 @@ test("applyPartStats: tolerates a missing stats file", () => {
   assert.equal(parts[0].points, null);
   assert.equal(parts[0].stats, null);
 });
+
+test("applyPartStats: per-mode stats; plain stats are the default mode's", () => {
+  const parts = [{ type: "Blade", name: "Hells Nether", modes: ["Normal", "Low"] }];
+  applyPartStats(parts, { Blade: { "Hells Nether": { points: null, modes: { Normal: { atk: 50, def: 50 }, Low: { atk: 70, def: null } } } } });
+  assert.deepEqual(parts[0].modeStats, { Normal: { atk: 50, def: 50 }, Low: { atk: 70 } });
+  assert.deepEqual(parts[0].stats, { atk: 50, def: 50 });
+});

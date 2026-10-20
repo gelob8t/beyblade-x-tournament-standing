@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   FORMATS, formatOf, validateDeck, comboStats, deckPoints,
-  encodeDeck, decodeDeck, randomizeDeck, ratchetIntegrated,
+  encodeDeck, decodeDeck, randomizeDeck, ratchetIntegrated, comboMode,
 } from "../js/decks.js";
 
 const PARTS = {
@@ -15,6 +15,9 @@ const PARTS = {
     { name: "Shark Edge", role: "Attack", points: 2 },
     { name: "Mystery", role: "" },
     { name: "Glory Valkyrie", role: "Attack", points: 4, ratchetIntegrated: true },
+    { name: "Hells Nether", role: "Balance", ratchetIntegrated: true, modes: ["Normal", "Low"],
+      stats: { atk: 50, def: 50, sta: 30 },
+      modeStats: { Normal: { atk: 50, def: 50, sta: 30 }, Low: { atk: 70, def: 45, sta: 15 } } },
   ],
   Ratchet: [
     { name: "3-60", points: 2, stats: { def: 5 } },
@@ -165,4 +168,28 @@ test("randomizeDeck leaves the ratchet empty for a ratchet-integrated blade", ()
   const d = randomizeDeck({ format: "standard", combos: [{}] }, pool, { rng: seeded(5) });
   assert.equal(d.combos[0].blade, "Glory Valkyrie");
   assert.equal(d.combos[0].ratchet, "");
+});
+
+test("blade modes: default mode, per-mode stats, unknown mode falls back", () => {
+  const c = { blade: "Hells Nether", ratchet: "", bit: "Flat" };
+  assert.equal(comboMode(c, lookup), "Normal");
+  assert.equal(comboMode({ ...c, mode: "Low" }, lookup), "Low");
+  assert.equal(comboMode({ ...c, mode: "Turbo" }, lookup), "Normal");
+  assert.equal(comboMode({ blade: "Dran Sword" }, lookup), "");
+  assert.deepEqual(comboStats(c, lookup), { atk: 80, def: 50, sta: 30, xd: 40, br: 0 });
+  assert.deepEqual(comboStats({ ...c, mode: "Low" }, lookup), { atk: 100, def: 45, sta: 15, xd: 40, br: 0 });
+});
+
+test("share links keep the blade mode, and old links without one still decode", () => {
+  const d = { name: "m", format: "standard", combos: [{ blade: "Hells Nether", ratchet: "", bit: "Flat", mode: "Low" }, { blade: "Dran Sword", ratchet: "3-60", bit: "Rush" }] };
+  const back = decodeDeck(encodeDeck(d));
+  assert.equal(back.combos[0].mode, "Low");
+  assert.equal("mode" in back.combos[1], false);
+});
+
+test("randomizeDeck picks a mode for a blade with modes", () => {
+  const pool = { ...PARTS, Blade: [PARTS.Blade.find((b) => b.modes)] };
+  const seen = new Set();
+  for (let i = 1; i < 30; i++) seen.add(randomizeDeck({ format: "standard", combos: [{}] }, pool, { rng: seeded(i) }).combos[0].mode);
+  assert.deepEqual([...seen].sort(), ["Low", "Normal"]);
 });

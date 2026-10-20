@@ -1,5 +1,5 @@
 {
-  "note": "Deck builder stats and Limited points, one line per catalog part. Fill in numbers (leave null for unknown). atk / def / sta / xd / br = Attack, Defense, Stamina, Xtreme Dash, Burst Resistance; a combo's stats are its three parts added together. points = the part's cost in Limited formats. limitedBudget = the max total points for a Limited deck (null = Limited can't be checked). statMax = the value a stat bar treats as full. A part added to parts.json later just needs a line here too.",
+  "note": "Deck builder stats and Limited points, one line per catalog part. Fill in numbers (leave null for unknown). atk / def / sta / xd / br = Attack, Defense, Stamina, Xtreme Dash, Burst Resistance; a combo's stats are its three parts added together. points = the part's cost in Limited formats. limitedBudget = the max total points for a Limited deck (null = Limited can't be checked). statMax = the value a stat bar treats as full. A blade with modes (see parts.json) can give per-mode stats instead: 'modes': { 'Normal': { ... }, 'Low': { ... } }. A part added to parts.json later just needs a line here too.",
   "limitedBudget": null,
   "statMax": 150,
   "Blade": {
@@ -50,7 +50,7 @@
     "Dran Brave S": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Perseus Dark B": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
     "Dragoon Storm": { "points": null, "atk": 55, "def": 30, "sta": 15, "xd": null, "br": null },
-    "Hells Nether": { "points": null, "atk": 50, "def": 50, "sta": 30, "xd": null, "br": null },
+    "Hells Nether": { "points": null, "modes": { "Normal": { "atk": 50, "def": 50, "sta": 30 }, "Low": { "atk": 70, "def": 45, "sta": 15 } } },
     "Mummy Curse": { "points": null, "atk": 30, "def": 60, "sta": 20, "xd": null, "br": null },
     "Tyranno Roar": { "points": null, "atk": 55, "def": 35, "sta": 30, "xd": null, "br": null },
     "Bahamut Blitz": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },

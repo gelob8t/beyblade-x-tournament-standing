@@ -1051,3 +1051,7 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
   .stat-delta { animation: stat-delta-still 1.6s step-end forwards; }
 }
 @keyframes stat-delta-still { 0%, 99% { opacity: 1; } 100% { opacity: 0; } }
+
+/* deck builder: blade mode switch (e.g. Hells Nether Normal / Low) */
+.deck-modes { display: flex; align-items: center; gap: .7rem; margin-top: .7rem; flex-wrap: wrap; }
+.deck-modes .seg { margin: 0; }

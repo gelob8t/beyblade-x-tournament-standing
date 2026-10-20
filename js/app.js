@@ -2718,8 +2718,13 @@ function deckCheck(d) {
   return decks.validateDeck(d, catalogPart, { budget: state.catalog?.limitedBudget ?? null });
 }
 
+function deckBladeLabel(c) {
+  const mode = decks.comboMode(c, catalogPart);
+  return c.blade && mode ? `${c.blade} (${mode})` : c.blade || "";
+}
+
 function deckComboLabel(c) {
-  return [c.blade, c.ratchet, c.bit].filter(Boolean).join(" ") || "—";
+  return [deckBladeLabel(c), c.ratchet, c.bit].filter(Boolean).join(" ") || "—";
 }
 
 function renderDecks(main) {
@@ -2783,7 +2788,7 @@ function renderDecks(main) {
 /** Open the builder on a saved deck, a single seed combo, or a blank 3-bey deck. */
 function openDeckBuilder(existing, seed, shared) {
   const src = shared || existing;
-  let combos = (src?.combos || []).map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "" }));
+  let combos = (src?.combos || []).map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "", ...(c.mode ? { mode: c.mode } : {}) }));
   if (!combos.length) combos = seed ? [{ blade: seed.blade || "", ratchet: seed.ratchet || "", bit: seed.bit || "" }] : [];
   while (combos.length < 3 && !src) combos.push({ blade: "", ratchet: "", bit: "" });
   state.deckDraft = {
@@ -2917,6 +2922,16 @@ function renderDeckBuilder(main) {
     </button>`;
   };
 
+  const modeSwitch = (c, i) => {
+    const modes = (c.blade && catalogPart("Blade", c.blade)?.modes) || [];
+    if (modes.length < 2) return "";
+    const active = decks.comboMode(c, catalogPart);
+    return `<div class="deck-modes">
+      <span class="muted small">${esc(c.blade)} mode</span>
+      <div class="seg">${modes.map((m) => `<button type="button" class="seg-btn${m === active ? " is-active" : ""}" data-mode="${i}" data-mode-val="${esc(m)}">${esc(m)}</button>`).join("")}</div>
+    </div>`;
+  };
+
   main.innerHTML = `
     <div class="view-head">
       <h1>${d.id ? "Edit deck" : "Build a deck"}</h1>
@@ -2949,6 +2964,7 @@ function renderDeckBuilder(main) {
           <button type="button" class="btn btn-ghost btn-sm" data-rand="${i}">Randomize</button>
         </div>
         <div class="deck-slots">${decks.PART_KEYS.map(([k, type]) => slot(c, i, k, type)).join("")}</div>
+        ${modeSwitch(c, i)}
         ${statsFor[i] ? statBars(statsFor[i], cat.statMax, (d.prevStats || [])[i]) : ""}
       </section>`).join("")}
 
@@ -2995,6 +3011,12 @@ function renderDeckBuilder(main) {
     }
     redraw();
   });
+  $$("[data-mode]", main).forEach((b) => b.addEventListener("click", () => {
+    const c = d.combos[Number(b.dataset.mode)];
+    if (c.mode === b.dataset.modeVal) return;
+    c.mode = b.dataset.modeVal;
+    redraw();
+  }));
   $$("[data-slot]", main).forEach((b) => b.addEventListener("click", () => {
     const [i, k] = b.dataset.slot.split("|");
     openPartPicker(Number(i), k);
@@ -3031,7 +3053,10 @@ function renderDeckBuilder(main) {
     const ok = await save("decks", existing, {
       name,
       format: d.format,
-      combos: d.combos.map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "" })),
+      combos: d.combos.map((c) => {
+        const mode = decks.comboMode(c, catalogPart);
+        return { blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "", ...(mode ? { mode } : {}) };
+      }),
       notes: d.notes.trim(),
     });
     if (!ok) { state.deckDraft = d; render(); }
@@ -3072,6 +3097,7 @@ function openPartPicker(i, k) {
   const results = box.querySelector("#pp-results");
 
   const choose = (name) => {
+    if (k === "blade" && d.combos[i].blade !== name) delete d.combos[i].mode;
     d.combos[i][k] = name;
     if (k === "blade" && decks.ratchetIntegrated(d.combos[i], catalogPart)) d.combos[i].ratchet = "";
     d.dirty = true;
@@ -3166,7 +3192,7 @@ function sharedDeckPreview(shared, { signedIn }) {
         <span class="rank-num">${i + 1}</span>
         ${decks.PART_KEYS.map(([k, type]) => `<span class="deck-preview-part">
           ${c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 44) : ""}
-          <span class="small">${esc(c[k] || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in ratchet" : "—"))}</span>
+          <span class="small">${esc((k === "blade" ? deckBladeLabel(c) : c[k]) || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in ratchet" : "—"))}</span>
         </span>`).join("")}
       </div>`).join("")}
       <div class="form-actions">
@@ -3282,7 +3308,7 @@ async function drawDeckImage(d) {
       ctx.fillText(type.toUpperCase(), cx + colW / 2, y0 + 190);
       ctx.fillStyle = SHARE_COLORS.text;
       ctx.font = '700 26px "Chakra Petch"';
-      const label = c[k] || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in" : "—");
+      const label = (k === "blade" ? deckBladeLabel(c) : c[k]) || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in" : "—");
       ctx.fillText(shareTruncate(ctx, label, colW - 16), cx + colW / 2, y0 + 222);
     }
 
