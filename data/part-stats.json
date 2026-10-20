@@ -70,7 +70,7 @@
     "0-80": { "points": null, "atk": 10, "def": 10, "sta": 10, "xd": null, "br": null },
     "1-50": { "points": null, "atk": 18, "def": 9, "sta": 3, "xd": null, "br": null },
     "1-60": { "points": null, "atk": 17, "def": 9, "sta": 4, "xd": null, "br": null },
-    "1-70": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
+    "1-70": { "points": null, "atk": 17, "def": 6, "sta": 7, "xd": null, "br": null },
     "1-80": { "points": null, "atk": 17, "def": 4, "sta": 9, "xd": null, "br": null },
     "2-60": { "points": null, "atk": 10, "def": 12, "sta": 8, "xd": null, "br": null },
     "2-70": { "points": null, "atk": 10, "def": 12, "sta": 8, "xd": null, "br": null },
