@@ -103,7 +103,7 @@
     "Under Flat": { "points": null, "atk": 55, "def": 5, "sta": 5, "xd": 35, "br": 80 },
     "Low Flat": { "points": null, "atk": 45, "def": 10, "sta": 5, "xd": 45, "br": 80 },
     "Rush": { "points": null, "atk": 35, "def": 15, "sta": 10, "xd": 45, "br": 80 },
-    "Low Rush": { "points": null, "atk": 45, "def": 5, "sta": 15, "xd": 35, "br": 8 },
+    "Low Rush": { "points": null, "atk": 45, "def": 5, "sta": 15, "xd": 35, "br": 80 },
     "Accel": { "points": null, "atk": 40, "def": 10, "sta": 5, "xd": 45, "br": 80 },
     "Rubber Accel": { "points": null, "atk": 60, "def": 17, "sta": 3, "xd": 20, "br": 80 },
     "Gear Flat": { "points": null, "atk": 50, "def": 5, "sta": 5, "xd": 40, "br": 80 },
