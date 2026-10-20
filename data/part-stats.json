@@ -80,7 +80,7 @@
     "3-80": { "points": null, "atk": 15, "def": 7, "sta": 8, "xd": null, "br": null },
     "3-85": { "points": null, "atk": 15, "def": 7, "sta": 8, "xd": null, "br": null },
     "4-50": { "points": null, "atk": 12, "def": 13, "sta": 5, "xd": null, "br": null },
-    "4-55": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
+    "4-55": { "points": null, "atk": 7, "def": 11, "sta": 12, "xd": null, "br": null },
     "4-60": { "points": null, "atk": 11, "def": 13, "sta": 6, "xd": null, "br": null },
     "4-70": { "points": null, "atk": 11, "def": 12, "sta": 7, "xd": null, "br": null },
     "4-80": { "points": null, "atk": 11, "def": 11, "sta": 8, "xd": null, "br": null },
