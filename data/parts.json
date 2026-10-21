@@ -28,7 +28,7 @@
     { "name": "Viper Tail", "system": "BX", "role": "Balance", "spin": "Right", "note": "Defensive balance, low-cost option." },
     { "name": "Rhino Horn", "system": "BX", "role": "Defense", "spin": "Right", "note": "Weight-forward defense, good KO resistance." },
     { "name": "Phoenix Feather", "system": "BX", "role": "Stamina", "spin": "Left", "note": "Base Phoenix stamina blade, precursor to Phoenix Wing." },
-    { "name": "Phoenix Wing", "system": "BX", "role": "Stamina", "spin": "Left", "note": "Outspin monster with strong burst resistance." },
+    { "name": "Phoenix Wing", "system": "BX", "role": "Attack", "spin": "Left", "note": "Attack type (per user); strong burst resistance." },
     { "name": "Phoenix Rudder", "system": "UX", "role": "Stamina", "spin": "", "note": "Phoenix-family stamina blade with a steering-style contact edge." },
     { "name": "Weiss Tiger", "system": "BX", "role": "Stamina", "spin": "Right", "note": "Low-profile stamina with disruption." },
     { "name": "Silver Wolf", "system": "BX", "role": "Stamina", "spin": "Right", "note": "Solid budget stamina blade." },
