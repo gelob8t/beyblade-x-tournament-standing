@@ -4,6 +4,7 @@
   "imageNote": "For photos: set imageBase to a folder URL and name each file after the part slug (run `npm run parts:slugs` for the full list) — e.g. imageBase \"./assets/parts/\" gives ./assets/parts/dran-sword.webp. WebP is strongly recommended over PNG/JPG for these — typically 8-15x smaller at the same visual quality, which is most of why the catalog loads fast. imageBase can also be an external CDN URL. Or put an explicit \"image\" URL on any single entry (that wins). A missing or broken image falls back to the generated icon.",
   "imageBase": "./assets/parts/",
   "imageExt": ".webp",
+  "imageVersion": "2",
   "roleColors": {
     "Attack": "#ff6a3d",
     "Stamina": "#37c6e8",

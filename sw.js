@@ -5,7 +5,7 @@ const BUILD = "__BUILD__";
 const CACHE = "bbx-" + BUILD;
 // Part photos live in their own cache that survives deploys, so ~120 images
 // aren't re-downloaded every time the app updates.
-const PARTS_CACHE = "bbx-parts-v1";
+const PARTS_CACHE = "bbx-parts-v2"; // bump to drop cached photos after replacing them
 
 const SHELL = [
   "./",

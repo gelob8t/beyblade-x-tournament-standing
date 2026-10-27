@@ -33,6 +33,8 @@ export async function loadCatalog() {
   const raw = await res.json();
   const base = raw.imageBase || "";
   const ext = raw.imageExt || ".png";
+  // bumped when photos are replaced so browsers don't keep showing the old file
+  const ver = raw.imageVersion ? "?v=" + encodeURIComponent(raw.imageVersion) : "";
   const tag = (list, type) =>
     (Array.isArray(list) ? list : []).map((p) => {
       const name = String(p.name || "").trim();
@@ -50,7 +52,7 @@ export async function loadCatalog() {
         modes: Array.isArray(p.modes) ? p.modes.map((m) => String(m).trim()).filter(Boolean) : [], // first = default
         note: p.note || "",
         // explicit URL wins; otherwise derive one from imageBase + slug
-        image: p.image || (base && slug ? base + slug + ext : ""),
+        image: p.image || (base && slug ? base + slug + ext + ver : ""),
       };
     }).filter((p) => p.name);
   const parts = [
