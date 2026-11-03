@@ -134,13 +134,13 @@
     "Gravity": { "points": null, "atk": 18, "def": 12, "sta": 10, "xd": null, "br": null }
   },
   "Metal Blade": {
-    "Blitz": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Fortress": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Rage": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Delta": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Whip": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Tread": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Force": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null }
+    "Blitz": { "points": null, "atk": 25, "def": 10, "sta": 5, "xd": null, "br": null },
+    "Fortress": { "points": null, "atk": 10, "def": 20, "sta": 10, "xd": null, "br": null },
+    "Rage": { "points": null, "atk": 10, "def": 10, "sta": 20, "xd": null, "br": null },
+    "Delta": { "points": null, "atk": 15, "def": 15, "sta": 10, "xd": null, "br": null },
+    "Whip": { "points": null, "atk": 8, "def": 12, "sta": 20, "xd": null, "br": null },
+    "Tread": { "points": null, "atk": 12, "def": 18, "sta": 10, "xd": null, "br": null },
+    "Force": { "points": null, "atk": 15, "def": 15, "sta": 10, "xd": null, "br": null }
   },
   "Ratchet": {
     "0-80": { "points": null, "atk": 10, "def": 10, "sta": 10, "xd": null, "br": null },

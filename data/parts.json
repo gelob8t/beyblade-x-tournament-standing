@@ -144,13 +144,13 @@
     { "name": "Gravity", "role": "Balance" }
   ],
   "metalBlades": [
-    { "name": "Blitz", "role": "" },
-    { "name": "Fortress", "role": "" },
-    { "name": "Rage", "role": "" },
-    { "name": "Delta", "role": "" },
-    { "name": "Whip", "role": "" },
-    { "name": "Tread", "role": "" },
-    { "name": "Force", "role": "" }
+    { "name": "Blitz", "role": "Attack" },
+    { "name": "Fortress", "role": "Defense" },
+    { "name": "Rage", "role": "Stamina" },
+    { "name": "Delta", "role": "Balance" },
+    { "name": "Whip", "role": "Stamina" },
+    { "name": "Tread", "role": "Defense" },
+    { "name": "Force", "role": "Balance" }
   ],
   "ratchets": [
     { "name": "0-80", "peaks": 0, "height": 80, "note": "Tall, no protrusions — smoothest possible contact; pure stamina/defense height." },
