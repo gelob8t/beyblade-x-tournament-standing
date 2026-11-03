@@ -1055,3 +1055,5 @@ input[type="color"] { padding: .2em; height: 2.4em; cursor: pointer; }
 /* deck builder: blade mode switch (e.g. Hells Nether Normal / Low) */
 .deck-modes { display: flex; align-items: center; gap: .7rem; margin-top: .7rem; flex-wrap: wrap; }
 .deck-modes .seg { margin: 0; }
+.deck-kind { display: inline-flex; margin: 0 0 .7rem; }
+.deck-preview-row.is-cx { grid-template-columns: 1.6rem; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }

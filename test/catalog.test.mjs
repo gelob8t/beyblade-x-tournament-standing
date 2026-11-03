@@ -1,7 +1,7 @@
 // Run: node --test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { matchesPartQuery, queryCatalog, roleColor, slugify, applyPartStats } from "../js/catalog.js";
+import { matchesPartQuery, queryCatalog, roleColor, slugify, applyPartStats, imageSlug, PART_TYPES } from "../js/catalog.js";
 
 const PARTS = [
   { type: "Blade", name: "Dran Sword", system: "BX", role: "Attack", spin: "Right", note: "original attacker" },
@@ -82,4 +82,22 @@ test("applyPartStats: per-mode stats; plain stats are the default mode's", () =>
   applyPartStats(parts, { Blade: { "Hells Nether": { points: null, modes: { Normal: { atk: 50, def: 50 }, Low: { atk: 70, def: null } } } } });
   assert.deepEqual(parts[0].modeStats, { Normal: { atk: 50, def: 50 }, Low: { atk: 70 } });
   assert.deepEqual(parts[0].stats, { atk: 50, def: 50 });
+});
+
+test("imageSlug: CX part types get a type prefix, the rest don't", () => {
+  assert.equal(imageSlug("Blade", "Dran Sword"), "dran-sword");
+  assert.equal(imageSlug("Lock Chip", "Dran"), "lock-chip-dran");
+  assert.equal(imageSlug("Main Blade", "Brave"), "main-blade-brave");
+  assert.equal(imageSlug("Over Blade", "Break"), "over-blade-break");
+  assert.equal(imageSlug("Assist Blade", "Slash"), "assist-blade-slash");
+  assert.equal(imageSlug("Bit", ""), "");
+});
+
+test("queryCatalog: CX part types sort between blades and ratchets", () => {
+  const out = queryCatalog([
+    { type: "Bit", name: "Ball" }, { type: "Assist Blade", name: "Slash" }, { type: "Ratchet", name: "3-60" },
+    { type: "Lock Chip", name: "Dran" }, { type: "Main Blade", name: "Brave" }, { type: "Blade", name: "Dran Sword" },
+  ], {});
+  assert.deepEqual(out.map((p) => p.type), ["Blade", "Lock Chip", "Main Blade", "Assist Blade", "Ratchet", "Bit"]);
+  assert.deepEqual(PART_TYPES, ["Blade", "Lock Chip", "Main Blade", "Over Blade", "Assist Blade", "Ratchet", "Bit"]);
 });

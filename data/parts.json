@@ -5,6 +5,7 @@
   "imageBase": "./assets/parts/",
   "imageExt": ".webp",
   "imageVersion": "2",
+  "cxNote": "CX blades can be built from parts: a Lock Chip + Main Blade + Assist Blade, plus an optional Over Blade (lockChips / mainBlades / overBlades / assistBlades below, same fields as blades). Their photo files are prefixed by type, e.g. lock-chip-dran.webp, main-blade-brave.webp (run npm run parts:slugs). A combo built from parts takes its blade role from the Main Blade.",
   "roleColors": {
     "Attack": "#ff6a3d",
     "Stamina": "#37c6e8",
@@ -75,6 +76,10 @@
     { "name": "Lightning L-Drago (Rapid Hit)", "system": "CX", "role": "Attack", "spin": "Left", "note": "Burst-legacy CX crossover; left-spin rapid-hit attacker." },
     { "name": "Lightning L-Drago (Upper)", "system": "CX", "role": "Attack", "spin": "Left", "note": "Burst-legacy CX crossover; left-spin upper-attack variant." }
   ],
+  "lockChips": [],
+  "mainBlades": [],
+  "overBlades": [],
+  "assistBlades": [],
   "ratchets": [
     { "name": "0-80", "peaks": 0, "height": 80, "note": "Tall, no protrusions — smoothest possible contact; pure stamina/defense height." },
     { "name": "1-50", "peaks": 1, "height": 50, "note": "Extra-low with a single protrusion. User-reported; not yet on beybxdb.com." },

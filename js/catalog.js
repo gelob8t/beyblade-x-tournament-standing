@@ -10,6 +10,32 @@ const ROLE_COLORS = {
   Balance: "#a98bff",
 };
 
+/**
+ * Every part type, in display order: [parts.json list, type, image prefix].
+ * CX blades can also be built from parts — Lock Chip + Main Blade +
+ * Assist Blade, plus an optional Over Blade. Those types get an image-file
+ * prefix so e.g. a lock chip and a blade with the same name don't collide.
+ */
+export const PART_GROUPS = [
+  ["blades", "Blade", ""],
+  ["lockChips", "Lock Chip", "lock-chip-"],
+  ["mainBlades", "Main Blade", "main-blade-"],
+  ["overBlades", "Over Blade", "over-blade-"],
+  ["assistBlades", "Assist Blade", "assist-blade-"],
+  ["ratchets", "Ratchet", ""],
+  ["bits", "Bit", ""],
+];
+export const PART_TYPES = PART_GROUPS.map(([, type]) => type);
+/** Types that carry an Attack/Stamina/Defense/Balance role. */
+export const ROLE_TYPES = ["Blade", "Main Blade", "Over Blade", "Assist Blade", "Bit"];
+
+/** Image file name (without extension) the app looks for, e.g. "lock-chip-dran". */
+export function imageSlug(type, name) {
+  const slug = slugify(name);
+  const prefix = PART_GROUPS.find(([, t]) => t === type)?.[2] || "";
+  return slug ? prefix + slug : "";
+}
+
 let cache = null;
 
 /**
@@ -38,7 +64,7 @@ export async function loadCatalog() {
   const tag = (list, type) =>
     (Array.isArray(list) ? list : []).map((p) => {
       const name = String(p.name || "").trim();
-      const slug = slugify(name);
+      const slug = imageSlug(type, name);
       return {
         type,
         name,
@@ -55,11 +81,7 @@ export async function loadCatalog() {
         image: p.image || (base && slug ? base + slug + ext + ver : ""),
       };
     }).filter((p) => p.name);
-  const parts = [
-    ...tag(raw.blades, "Blade"),
-    ...tag(raw.ratchets, "Ratchet"),
-    ...tag(raw.bits, "Bit"),
-  ];
+  const parts = PART_GROUPS.flatMap(([list, type]) => tag(raw[list], type));
   // deck-builder stats/points live in their own file; missing is fine
   let statsRaw = null;
   try {
@@ -73,9 +95,7 @@ export async function loadCatalog() {
     limitedBudget: typeof statsRaw?.limitedBudget === "number" ? statsRaw.limitedBudget : null,
     statMax: typeof statsRaw?.statMax === "number" && statsRaw.statMax > 0 ? statsRaw.statMax : 150,
     roleColors: { ...ROLE_COLORS, ...(raw.roleColors || {}) },
-    blades: parts.filter((p) => p.type === "Blade"),
-    ratchets: parts.filter((p) => p.type === "Ratchet"),
-    bits: parts.filter((p) => p.type === "Bit"),
+    ...Object.fromEntries(PART_GROUPS.map(([list, type]) => [list, parts.filter((p) => p.type === type)])),
     parts,
   };
   return cache;
@@ -91,7 +111,7 @@ const STAT_FIELDS = ["atk", "def", "sta", "xd", "br"];
  */
 export function applyPartStats(parts, raw) {
   const byType = {};
-  for (const type of ["Blade", "Ratchet", "Bit"]) {
+  for (const type of PART_TYPES) {
     byType[type] = new Map(Object.entries((raw && raw[type]) || {}).map(([n, v]) => [n.trim().toLowerCase(), v]));
   }
   for (const p of parts) {
@@ -135,9 +155,9 @@ export function matchesPartQuery(part, { q = "", type = "", role = "", system = 
   return true;
 }
 
-const TYPE_ORDER = { Blade: 0, Ratchet: 1, Bit: 2 };
+const TYPE_ORDER = Object.fromEntries(PART_TYPES.map((t, i) => [t, i]));
 
-/** Filter + sort a catalog list for display (Blade → Ratchet → Bit, then name). */
+/** Filter + sort a catalog list for display (in PART_GROUPS order, then name). */
 export function queryCatalog(parts, filters = {}) {
   return (parts || [])
     .filter((p) => matchesPartQuery(p, filters))

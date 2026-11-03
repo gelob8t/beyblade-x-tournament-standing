@@ -240,11 +240,7 @@ async function loadMetaParts() {
   const empty = { Blade: [], Ratchet: [], Bit: [] };
   try {
     const c = await catalog.loadCatalog();
-    return {
-      Blade: c.blades.map((b) => b.name),
-      Ratchet: c.ratchets.map((r) => r.name),
-      Bit: c.bits.map((b) => b.name),
-    };
+    return Object.fromEntries(catalog.PART_TYPES.map((t) => [t, c.parts.filter((p) => p.type === t).map((p) => p.name)]));
   } catch { /* fall through to the tier list */ }
   try {
     const m = await meta.loadCurated();
@@ -2424,7 +2420,7 @@ function liveScoring(template) {
 // ---------------------------------------------------------------------------
 // Collection
 // ---------------------------------------------------------------------------
-const PART_TYPES = ["Blade", "Ratchet", "Bit"];
+const PART_TYPES = catalog.PART_TYPES;
 
 /** Find a loaded-catalog entry for an owned part, by type + name. Ignores
  *  case, spaces and punctuation, so "MummyCurse" / "mummy-curse" find
@@ -2451,6 +2447,8 @@ function renderCollection(main) {
     <div class="collection-grid">
       ${PART_TYPES.map((type) => {
         const items = state.beys.filter((b) => b.type === type);
+        // the CX part types only get a panel once you own one
+        if (!items.length && !["Blade", "Ratchet", "Bit"].includes(type)) return "";
         return `<section class="panel">
           <h2>${type}s <span class="muted">(${items.length})</span></h2>
           ${items.length ? `<ul class="part-list">
@@ -2484,7 +2482,7 @@ function renderCollection(main) {
 function beyForm(existing) {
   const { form, values } = buildForm([
     { name: "type", label: "Part type", type: "select", options: PART_TYPES.map((v) => ({ value: v, label: v })) },
-    { name: "name", label: "Name", required: true, placeholder: "Dran Sword / 3-60 / Flat" },
+    { name: "name", label: "Name", required: true, placeholder: "Dran Sword / 3-60 / Flat / Dran (lock chip)" },
     { name: "notes", label: "Notes", type: "textarea", placeholder: "Condition, source, weight…" },
   ], existing || {});
 
@@ -2501,13 +2499,13 @@ function beyForm(existing) {
 }
 
 function bulkBeyForm() {
+  const examples = {
+    Blade: "Dran Sword\nHells Scythe\nWizard Arrow",
+    Ratchet: "3-60\n9-60\n1-60",
+    Bit: "Flat\nBall\nTaper",
+  };
   const { form, values } = buildForm([
-    { name: "Blade", label: "Blades — one per line", type: "textarea",
-      placeholder: "Dran Sword\nHells Scythe\nWizard Arrow" },
-    { name: "Ratchet", label: "Ratchets — one per line", type: "textarea",
-      placeholder: "3-60\n9-60\n1-60" },
-    { name: "Bit", label: "Bits — one per line", type: "textarea",
-      placeholder: "Flat\nBall\nTaper" },
+    ...PART_TYPES.map((type) => ({ name: type, label: `${type}s — one per line`, type: "textarea", placeholder: examples[type] || "" })),
     { name: "skipExisting", label: "Skip names already in my collection", type: "checkbox", default: true },
   ]);
 
@@ -2573,6 +2571,29 @@ function partSvg(part, size = 40) {
     inner = `<polygon points="${pts.join(" ")}" fill="${col}" stroke="${stroke}"/>
       <circle cx="20" cy="20" r="4.5" fill="#0b0f17"/>
       ${spin ? `<text x="20" y="24.6" text-anchor="middle" font-size="9" font-weight="700" fill="${col}">${spin}</text>` : ""}`;
+  } else if (part.type === "Lock Chip") {
+    inner = `<circle cx="20" cy="20" r="11" fill="#141b28" stroke="${col}" stroke-width="2.4"/>
+      <path d="M15.5 20 L20 14.5 L24.5 20 L20 25.5 Z" fill="${col}"/>`;
+  } else if (part.type === "Main Blade" || part.type === "Over Blade") {
+    // a blade ring with an open centre (the lock chip sits there)
+    const cx = 20, cy = 20, n = part.type === "Over Blade" ? 3 : 5, pts = [];
+    const R = part.type === "Over Blade" ? 13 : 16, r = part.type === "Over Blade" ? 9 : 10;
+    for (let i = 0; i < n * 2; i++) {
+      const ang = (Math.PI / n) * i - Math.PI / 2;
+      const rad = i % 2 ? r : R;
+      pts.push(`${(cx + rad * Math.cos(ang)).toFixed(1)},${(cy + rad * Math.sin(ang)).toFixed(1)}`);
+    }
+    inner = `<polygon points="${pts.join(" ")}" fill="${col}" stroke="${stroke}"/>
+      <circle cx="20" cy="20" r="6.5" fill="#0b0f17" stroke="${stroke}"/>`;
+  } else if (part.type === "Assist Blade") {
+    const tabs = [];
+    for (let i = 0; i < 4; i++) {
+      const a = (Math.PI / 2) * i + Math.PI / 4;
+      tabs.push(`<rect x="17" y="2.5" width="6" height="6" rx="1.2" fill="${col}" transform="rotate(${(a * 180 / Math.PI).toFixed(0)} 20 20)"/>`);
+    }
+    inner = `<circle cx="20" cy="20" r="13" fill="none" stroke="${col}" stroke-width="4"/>
+      ${tabs.join("")}
+      <circle cx="20" cy="20" r="7" fill="#141b28" stroke="${stroke}"/>`;
   } else if (part.type === "Ratchet") {
     const n = Math.max(3, Math.min(12, part.peaks || 6)), ticks = [];
     for (let i = 0; i < n; i++) {
@@ -2629,7 +2650,7 @@ async function catalogPicker() {
 
   const chip = (label, val, k) => `<button type="button" class="chip-btn" data-key="${k}" data-val="${esc(val)}">${esc(label)}</button>`;
   box.querySelector("#cat-type").innerHTML =
-    [chip("All", "", "type"), ...["Blade", "Ratchet", "Bit"].map((t) => chip(t + "s", t, "type"))].join("");
+    [chip("All", "", "type"), ...PART_TYPES.map((t) => chip(t + "s", t, "type"))].join("");
   box.querySelector("#cat-role").innerHTML =
     [chip("Any role", "", "role"), ...["Attack", "Stamina", "Defense", "Balance"].map((r) => chip(r, r, "role"))].join("");
   box.querySelector("#cat-system").innerHTML =
@@ -2642,7 +2663,7 @@ async function catalogPicker() {
   const sysRow = box.querySelector("#cat-system");
 
   const draw = () => {
-    roleRow.hidden = f.type === "Ratchet";
+    roleRow.hidden = !!f.type && !catalog.ROLE_TYPES.includes(f.type);
     sysRow.hidden = !(f.type === "" || f.type === "Blade");
     if (roleRow.hidden) f.role = "";
     if (sysRow.hidden) f.system = "";
@@ -2719,6 +2740,7 @@ function deckCheck(d) {
 }
 
 function deckBladeLabel(c) {
+  if (decks.isCx(c)) return decks.CX_KEYS.map(([k]) => c[k]).filter(Boolean).join(" ");
   const mode = decks.comboMode(c, catalogPart);
   return c.blade && mode ? `${c.blade} (${mode})` : c.blade || "";
 }
@@ -2740,7 +2762,7 @@ function renderDecks(main) {
         const used = state.matches.filter((m) => m.myDeck === d.name);
         const w = used.filter((m) => matchResult(m) === "W").length;
         const l = used.filter((m) => matchResult(m) === "L").length;
-        const combos = (d.combos || []).filter((c) => c.blade || c.ratchet || c.bit);
+        const combos = (d.combos || []).filter((c) => decks.comboKeys(c).some(([k]) => c[k]));
         const f = decks.formatOf(d.format);
         const check = state.catalog ? deckCheck({ ...d, combos }) : null;
         return `<article class="card">
@@ -2748,7 +2770,7 @@ function renderDecks(main) {
             <h3>${esc(d.name)}</h3>
             <div class="deck-mini">
               ${combos.map((c) => `<div class="deck-mini-row">
-                <span class="deck-mini-icons">${decks.PART_KEYS.map(([k, type]) => c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 24) : "").join("")}</span>
+                <span class="deck-mini-icons">${decks.comboKeys(c).map(([k, type]) => c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 24) : "").join("")}</span>
                 <span>${esc(deckComboLabel(c))}</span>
               </div>`).join("") || `<p class="muted">No combos set</p>`}
             </div>
@@ -2788,7 +2810,7 @@ function renderDecks(main) {
 /** Open the builder on a saved deck, a single seed combo, or a blank 3-bey deck. */
 function openDeckBuilder(existing, seed, shared) {
   const src = shared || existing;
-  let combos = (src?.combos || []).map((c) => ({ blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "", ...(c.mode ? { mode: c.mode } : {}) }));
+  let combos = (src?.combos || []).map((c) => decks.cleanCombo(c));
   if (!combos.length) combos = seed ? [{ blade: seed.blade || "", ratchet: seed.ratchet || "", bit: seed.bit || "" }] : [];
   while (combos.length < 3 && !src) combos.push({ blade: "", ratchet: "", bit: "" });
   state.deckDraft = {
@@ -2815,7 +2837,7 @@ function randSource() {
 
 /** Parts the randomizer may use: the whole catalog, or just what you own. */
 function deckPool(source) {
-  const pool = { Blade: [], Ratchet: [], Bit: [] };
+  const pool = Object.fromEntries(PART_TYPES.map((t) => [t, []]));
   const parts = state.catalog?.parts || [];
   if (source !== "mine") {
     for (const p of parts) pool[p.type]?.push(p);
@@ -2911,18 +2933,20 @@ function renderDeckBuilder(main) {
     }
     const part = name ? catalogPart(type, name) : null;
     const dupe = name && check.dupes.has(type + "|" + name.trim().toLowerCase());
+    const optional = decks.isCx(c) && decks.CX_OPTIONAL.includes(k);
     const metaBits = [part?.role, part?.points != null ? `${part.points} pts` : ""].filter(Boolean).join(" · ");
     return `<button type="button" class="deck-slot${dupe ? " is-dupe" : ""}${name ? "" : " is-empty"}" data-slot="${i}|${k}">
       ${name ? partIcon(part || { type, name }, 44) : `<span class="deck-slot-plus" aria-hidden="true">+</span>`}
       <span class="deck-slot-main">
         <span class="deck-slot-type">${type}</span>
-        <b>${name ? esc(name) : "Choose…"}</b>
+        <b>${name ? esc(name) : optional ? "Optional" : "Choose…"}</b>
         ${metaBits ? `<span class="muted small">${esc(metaBits)}</span>` : ""}
       </span>
     </button>`;
   };
 
   const modeSwitch = (c, i) => {
+    if (decks.isCx(c)) return "";
     const modes = (c.blade && catalogPart("Blade", c.blade)?.modes) || [];
     if (modes.length < 2) return "";
     const active = decks.comboMode(c, catalogPart);
@@ -2963,7 +2987,11 @@ function renderDeckBuilder(main) {
           <span class="muted small deck-combo-name">${esc(deckComboLabel(c))}</span>
           <button type="button" class="btn btn-ghost btn-sm" data-rand="${i}">Randomize</button>
         </div>
-        <div class="deck-slots">${decks.PART_KEYS.map(([k, type]) => slot(c, i, k, type)).join("")}</div>
+        <div class="seg deck-kind" role="group" aria-label="Blade kind">
+          <button type="button" class="seg-btn${decks.isCx(c) ? "" : " is-active"}" data-kind="${i}" data-kind-val="blade">Blade</button>
+          <button type="button" class="seg-btn${decks.isCx(c) ? " is-active" : ""}" data-kind="${i}" data-kind-val="cx">CX build</button>
+        </div>
+        <div class="deck-slots${decks.isCx(c) ? " is-cx" : ""}">${decks.comboKeys(c).map(([k, type]) => slot(c, i, k, type)).join("")}</div>
         ${modeSwitch(c, i)}
         ${statsFor[i] ? statBars(statsFor[i], cat.statMax, (d.prevStats || [])[i]) : ""}
       </section>`).join("")}
@@ -3017,7 +3045,19 @@ function renderDeckBuilder(main) {
     c.mode = b.dataset.modeVal;
     redraw();
   }));
-  $$("[data-slot]", main).forEach((b) => b.addEventListener("click", () => {
+  // whole blade <-> CX build (Lock Chip + Main Blade + Over Blade + Assist Blade);
+  // the ratchet and bit carry over
+  $("[data-kind]", main).forEach((b) => b.addEventListener("click", () => {
+    const i = Number(b.dataset.kind);
+    const c = d.combos[i];
+    const toCx = b.dataset.kindVal === "cx";
+    if (toCx === decks.isCx(c)) return;
+    d.combos[i] = toCx
+      ? { blade: "", ratchet: c.ratchet || "", bit: c.bit || "", cx: true, lockChip: "", mainBlade: "", overBlade: "", assistBlade: "" }
+      : { blade: "", ratchet: c.ratchet || "", bit: c.bit || "" };
+    redraw();
+  }));
+  $("[data-slot]", main).forEach((b) => b.addEventListener("click", () => {
     const [i, k] = b.dataset.slot.split("|");
     openPartPicker(Number(i), k);
   }));
@@ -3053,10 +3093,7 @@ function renderDeckBuilder(main) {
     const ok = await save("decks", existing, {
       name,
       format: d.format,
-      combos: d.combos.map((c) => {
-        const mode = decks.comboMode(c, catalogPart);
-        return { blade: c.blade || "", ratchet: c.ratchet || "", bit: c.bit || "", ...(mode ? { mode } : {}) };
-      }),
+      combos: d.combos.map((c) => decks.cleanCombo(c, decks.comboMode(c, catalogPart))),
       notes: d.notes.trim(),
     });
     if (!ok) { state.deckDraft = d; render(); }
@@ -3066,7 +3103,7 @@ function renderDeckBuilder(main) {
 /** Choose a part for one slot: catalog parts (photos, roles, owned) plus your own custom names. */
 function openPartPicker(i, k) {
   const d = state.deckDraft;
-  const type = { blade: "Blade", ratchet: "Ratchet", bit: "Bit" }[k];
+  const type = decks.comboKeys(d.combos[i]).find(([x]) => x === k)?.[1] || "Blade";
   const key = (n) => String(n || "").trim().toLowerCase();
   const usedIn = new Map();
   d.combos.forEach((c, j) => { if (j !== i && c[k]) usedIn.set(key(c[k]), j + 1); });
@@ -3106,7 +3143,7 @@ function openPartPicker(i, k) {
   };
 
   const draw = () => {
-    const roles = type === "Ratchet" ? [] : ["Attack", "Stamina", "Defense", "Balance"];
+    const roles = catalog.ROLE_TYPES.includes(type) ? ["Attack", "Stamina", "Defense", "Balance"] : [];
     chips.innerHTML = [
       `<button type="button" class="chip-btn${!f.role && !f.owned ? " is-active" : ""}" data-r="">All</button>`,
       ...roles.map((r) => `<button type="button" class="chip-btn${f.role === r ? " is-active" : ""}" data-r="${r}">${r}</button>`),
@@ -3188,9 +3225,9 @@ function sharedDeckPreview(shared, { signedIn }) {
     box.innerHTML = `
       <p class="muted small">${esc(f.label)} · ${shared.combos.length} bey${shared.combos.length === 1 ? "" : "s"}
         ${check ? (check.ok ? " · <b class=\"deck-ok\">✓ legal</b>" : ` · <b class="danger-text">✕ ${check.errors.length} issue${check.errors.length === 1 ? "" : "s"}</b>`) : ""}</p>
-      ${shared.combos.map((c, i) => `<div class="deck-preview-row">
+      ${shared.combos.map((c, i) => `<div class="deck-preview-row${decks.isCx(c) ? " is-cx" : ""}">
         <span class="rank-num">${i + 1}</span>
-        ${decks.PART_KEYS.map(([k, type]) => `<span class="deck-preview-part">
+        ${decks.comboKeys(c).filter(([k]) => c[k] || !decks.CX_OPTIONAL.includes(k) || !decks.isCx(c)).map(([k, type]) => `<span class="deck-preview-part">
           ${c[k] ? partIcon(catalogPart(type, c[k]) || { type, name: c[k] }, 44) : ""}
           <span class="small">${esc((k === "blade" ? deckBladeLabel(c) : c[k]) || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in ratchet" : "—"))}</span>
         </span>`).join("")}
@@ -3293,21 +3330,24 @@ async function drawDeckImage(d) {
     ctx.textAlign = "center";
     ctx.fillText(String(i + 1), PAD + 46, y0 + 72);
 
-    const colW = partsW / 3;
+    // a CX build shows each blade part; an empty (optional) Over Blade is skipped
+    const slots = decks.comboKeys(c).filter(([k]) => c[k] || !decks.isCx(c) || !decks.CX_OPTIONAL.includes(k));
+    const colW = partsW / slots.length;
+    const imgS = Math.min(140, colW - 12);
     const x0 = PAD + 90;
-    for (let p = 0; p < 3; p++) {
-      const [k, type] = decks.PART_KEYS[p];
+    for (let p = 0; p < slots.length; p++) {
+      const [k, type] = slots[p];
       const cx = x0 + colW * p;
       if (c[k]) {
         const img = await partImageEl(type, c[k]);
-        if (img) drawContain(ctx, img, cx + (colW - 140) / 2, y0 + 22, 140, 140);
+        if (img) drawContain(ctx, img, cx + (colW - imgS) / 2, y0 + 22 + (140 - imgS) / 2, imgS, imgS);
       }
       ctx.textAlign = "center";
       ctx.fillStyle = SHARE_COLORS.muted;
-      ctx.font = '600 18px "Inter"';
-      ctx.fillText(type.toUpperCase(), cx + colW / 2, y0 + 190);
+      ctx.font = `600 ${slots.length > 3 ? 14 : 18}px "Inter"`;
+      ctx.fillText(shareTruncate(ctx, type.toUpperCase(), colW - 8), cx + colW / 2, y0 + 190);
       ctx.fillStyle = SHARE_COLORS.text;
-      ctx.font = '700 26px "Chakra Petch"';
+      ctx.font = `700 ${slots.length > 3 ? 20 : 26}px "Chakra Petch"`;
       const label = (k === "blade" ? deckBladeLabel(c) : c[k]) || (k === "ratchet" && decks.ratchetIntegrated(c, catalogPart) ? "Built-in" : "—");
       ctx.fillText(shareTruncate(ctx, label, colW - 16), cx + colW / 2, y0 + 222);
     }

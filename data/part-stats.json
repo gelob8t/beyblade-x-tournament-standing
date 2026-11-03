@@ -1,5 +1,5 @@
 {
-  "note": "Deck builder stats and Limited points, one line per catalog part. Fill in numbers (leave null for unknown). atk / def / sta / xd / br = Attack, Defense, Stamina, Xtreme Dash, Burst Resistance; a combo's stats are its three parts added together. points = the part's cost in Limited formats. limitedBudget = the max total points for a Limited deck (null = Limited can't be checked). statMax = the value a stat bar treats as full. A blade with modes (see parts.json) can give per-mode stats instead: 'modes': { 'Normal': { ... }, 'Low': { ... } }. A part added to parts.json later just needs a line here too.",
+  "note": "Deck builder stats and Limited points, one line per catalog part. Fill in numbers (leave null for unknown). atk / def / sta / xd / br = Attack, Defense, Stamina, Xtreme Dash, Burst Resistance; a combo's stats are its parts added together (for a CX build: Lock Chip + Main Blade + Over Blade + Assist Blade + Ratchet + Bit). points = the part's cost in Limited formats. limitedBudget = the max total points for a Limited deck (null = Limited can't be checked). statMax = the value a stat bar treats as full. A blade with modes (see parts.json) can give per-mode stats instead: 'modes': { 'Normal': { ... }, 'Low': { ... } }. A part added to parts.json later just needs a line here too.",
   "limitedBudget": null,
   "statMax": 150,
   "Blade": {
@@ -66,6 +66,10 @@
     "Lightning L-Drago (Rapid Hit)": { "points": null, "atk": 50, "def": 30, "sta": 20, "xd": null, "br": null },
     "Lightning L-Drago (Upper)": { "points": null, "atk": 55, "def": 25, "sta": 20, "xd": null, "br": null }
   },
+  "Lock Chip": {},
+  "Main Blade": {},
+  "Over Blade": {},
+  "Assist Blade": {},
   "Ratchet": {
     "0-80": { "points": null, "atk": 10, "def": 10, "sta": 10, "xd": null, "br": null },
     "1-50": { "points": null, "atk": 18, "def": 9, "sta": 3, "xd": null, "br": null },

@@ -4,10 +4,52 @@
 //
 // A deck is { name, format, combos: [{ blade, ratchet, bit, mode? }] } —
 // `mode` only matters for a blade with modes (e.g. Hells Nether Normal/Low).
+// A CX build swaps the whole blade for its parts:
+//   { cx: true, lockChip, mainBlade, overBlade?, assistBlade, ratchet, bit }
+// and takes its blade role from the Main Blade.
 // `lookup(type, name)` returns the catalog part ({ role, points, stats }) or
 // null for a part that isn't in the catalog.
 
 export const PART_KEYS = [["blade", "Blade"], ["ratchet", "Ratchet"], ["bit", "Bit"]];
+
+// the blade parts of a CX build, in display order; the Over Blade is optional
+export const CX_KEYS = [["lockChip", "Lock Chip"], ["mainBlade", "Main Blade"], ["overBlade", "Over Blade"], ["assistBlade", "Assist Blade"]];
+export const CX_OPTIONAL = ["overBlade"];
+
+/** True when the combo is a CX build (blade made from parts). */
+export function isCx(combo) {
+  return !!(combo && (combo.cx || CX_KEYS.some(([k]) => combo[k])));
+}
+
+/** The [key, type] slots a combo uses: a whole blade, or the CX blade parts. */
+export function comboKeys(combo) {
+  return isCx(combo) ? [...CX_KEYS, ["ratchet", "Ratchet"], ["bit", "Bit"]] : PART_KEYS;
+}
+
+/** [type, name] of the part that sets the combo's blade role. */
+export function bladePart(combo) {
+  return isCx(combo) ? ["Main Blade", combo.mainBlade || ""] : ["Blade", (combo && combo.blade) || ""];
+}
+
+/** A clean copy of a combo with only the fields its kind uses. */
+export function cleanCombo(c, mode) {
+  c = c || {};
+  const s = (v) => String(v || "").trim();
+  if (isCx(c)) {
+    const out = { blade: "", ratchet: s(c.ratchet), bit: s(c.bit), cx: true };
+    for (const [k] of CX_KEYS) out[k] = s(c[k]);
+    return out;
+  }
+  const m = mode === undefined ? c.mode : mode;
+  return { blade: s(c.blade), ratchet: s(c.ratchet), bit: s(c.bit), ...(m ? { mode: m } : {}) };
+}
+
+/** Is every required slot of the combo filled? */
+export function comboComplete(c, lookup) {
+  if (!c || !c.bit) return false;
+  if (isCx(c)) return !!c.ratchet && CX_KEYS.every(([k]) => CX_OPTIONAL.includes(k) || c[k]);
+  return !!(c.blade && (c.ratchet || ratchetIntegrated(c, lookup)));
+}
 
 export const STAT_KEYS = [
   ["atk", "Attack"],
@@ -40,11 +82,12 @@ const norm = (s) => String(s || "").trim().toLowerCase();
 
 /** True when the combo's blade has a built-in ratchet (no ratchet slot). */
 export function ratchetIntegrated(combo, lookup) {
-  return !!(combo && combo.blade && lookup("Blade", combo.blade)?.ratchetIntegrated);
+  return !!(combo && !isCx(combo) && combo.blade && lookup("Blade", combo.blade)?.ratchetIntegrated);
 }
 
 /** The blade's active mode: the combo's `mode` if valid, else the default (first); "" for no modes. */
 export function comboMode(combo, lookup) {
+  if (isCx(combo)) return "";
   const modes = (combo && combo.blade && lookup("Blade", combo.blade)?.modes) || [];
   if (!modes.length) return "";
   return modes.includes(combo.mode) ? combo.mode : modes[0];
@@ -54,7 +97,7 @@ export function comboMode(combo, lookup) {
 export function comboStats(combo, lookup) {
   const out = Object.fromEntries(STAT_KEYS.map(([k]) => [k, 0]));
   let any = false;
-  for (const [k, type] of PART_KEYS) {
+  for (const [k, type] of comboKeys(combo)) {
     const part = combo && combo[k] ? lookup(type, combo[k]) : null;
     const mode = k === "blade" ? comboMode(combo, lookup) : "";
     const s = (mode && part?.modeStats?.[mode]) || part?.stats || null;
@@ -71,7 +114,7 @@ export function deckPoints(combos, lookup) {
   let total = 0;
   const missing = [];
   for (const c of combos || []) {
-    for (const [k, type] of PART_KEYS) {
+    for (const [k, type] of comboKeys(c)) {
       if (!c || !c[k]) continue;
       const p = lookup(type, c[k])?.points;
       if (typeof p === "number") total += p;
@@ -94,7 +137,7 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
   const warnings = [];
 
   if (f.size && combos.length !== f.size) errors.push(`${f.label} decks have exactly ${f.size} beys.`);
-  const incomplete = combos.filter((c) => !(c.blade && c.bit && (c.ratchet || ratchetIntegrated(c, lookup)))).length;
+  const incomplete = combos.filter((c) => !comboComplete(c, lookup)).length;
   if (incomplete) errors.push(`${incomplete} bey${incomplete === 1 ? " is" : "s are"} missing a part.`);
   combos.forEach((c, i) => {
     if (c.ratchet && ratchetIntegrated(c, lookup)) {
@@ -106,7 +149,7 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
   const seen = new Map();
   const dupes = new Set();
   for (const c of combos) {
-    for (const [k, type] of PART_KEYS) {
+    for (const [k, type] of comboKeys(c)) {
       if (!c[k]) continue;
       const key = type + "|" + norm(c[k]);
       if (seen.has(key)) dupes.add(key);
@@ -122,18 +165,22 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
   const unknownRole = new Set();
   const noteUnknown = (type, name) => { if (name && !roleOf(type, name)) unknownRole.add(name); };
 
+  // the blade role comes from the whole blade, or a CX build's Main Blade
+  const bladeRole = (c) => roleOf(...bladePart(c));
+  const bitPart = (c) => ["Bit", c.bit || ""];
+
   if (f.rule === "bad") {
-    for (const [k, type] of [["blade", "Blade"], ["bit", "Bit"]]) {
-      combos.forEach((c) => noteUnknown(type, c[k]));
-      const have = new Set(combos.map((c) => roleOf(type, c[k])).filter(Boolean));
+    for (const [which, partOf] of [["blade", bladePart], ["bit", bitPart]]) {
+      combos.forEach((c) => noteUnknown(...partOf(c)));
+      const have = new Set(combos.map((c) => roleOf(...partOf(c))).filter(Boolean));
       const missing = BAD_ROLES.filter((r) => !have.has(r));
-      if (missing.length) errors.push(`Needs ${missing.map((r) => `a${r === "Attack" ? "n" : ""} ${r}`).join(", ")} ${type.toLowerCase()}.`);
+      if (missing.length) errors.push(`Needs ${missing.map((r) => `a${r === "Attack" ? "n" : ""} ${r}`).join(", ")} ${which}.`);
     }
   } else if (f.rule === "dab") {
     const pairRoles = [];
     combos.forEach((c, i) => {
-      noteUnknown("Blade", c.blade); noteUnknown("Bit", c.bit);
-      const b = roleOf("Blade", c.blade), t = roleOf("Bit", c.bit);
+      noteUnknown(...bladePart(c)); noteUnknown("Bit", c.bit);
+      const b = bladeRole(c), t = roleOf("Bit", c.bit);
       if (b && t && b !== t) errors.push(`Bey ${i + 1}: ${b} blade with a ${t} bit — they must match.`);
       else if (b && t && !BAD_ROLES.includes(b)) errors.push(`Bey ${i + 1}: ${b} pairs aren't allowed — use Defense, Attack or Balance.`);
       if (b && b === t) pairRoles.push(b);
@@ -144,10 +191,10 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
     }
   } else if (f.rule === "all-attack") {
     combos.forEach((c, i) => {
-      for (const [k, type] of [["blade", "Blade"], ["bit", "Bit"]]) {
-        noteUnknown(type, c[k]);
-        const r = roleOf(type, c[k]);
-        if (r && r !== "Attack") errors.push(`Bey ${i + 1}: ${c[k]} is a ${r} ${type.toLowerCase()}, not Attack.`);
+      for (const [type, name] of [bladePart(c), bitPart(c)]) {
+        noteUnknown(type, name);
+        const r = roleOf(type, name);
+        if (r && r !== "Attack") errors.push(`Bey ${i + 1}: ${name} is a ${r} ${type.toLowerCase()}, not Attack.`);
       }
     });
   }
@@ -166,9 +213,12 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
 // ---- share links ----------------------------------------------------------
 // The deck goes in the URL as base64url(JSON) of a compact shape:
 //   { n: name, f: format, c: [[blade, ratchet, bit, mode?], ...] }
+// A CX build's row is ["", ratchet, bit, "", { l, m, o?, a }] (lock chip,
+// main, over and assist blade), so older links still decode the same.
 
 const MAX_NAME = 60;
 const MAX_PART = 40;
+const CX_SHORT = { lockChip: "l", mainBlade: "m", overBlade: "o", assistBlade: "a" };
 
 function b64urlEncode(str) {
   const bytes = new TextEncoder().encode(str);
@@ -187,8 +237,14 @@ export function encodeDeck(deck) {
   const compact = {
     n: String(deck.name || "").slice(0, MAX_NAME),
     f: formatOf(deck.format).key,
-    c: (deck.combos || []).slice(0, MAX_BEYS).map((c) =>
-      c.mode ? [c.blade || "", c.ratchet || "", c.bit || "", c.mode] : [c.blade || "", c.ratchet || "", c.bit || ""]),
+    c: (deck.combos || []).slice(0, MAX_BEYS).map((c) => {
+      if (isCx(c)) {
+        const parts = {};
+        for (const [k] of CX_KEYS) if (c[k]) parts[CX_SHORT[k]] = c[k];
+        return ["", c.ratchet || "", c.bit || "", "", parts];
+      }
+      return c.mode ? [c.blade || "", c.ratchet || "", c.bit || "", c.mode] : [c.blade || "", c.ratchet || "", c.bit || ""];
+    }),
   };
   return b64urlEncode(JSON.stringify(compact));
 }
@@ -202,6 +258,12 @@ export function decodeDeck(s) {
     const combos = o.c.slice(0, MAX_BEYS).map((row) => {
       const r = Array.isArray(row) ? row : [];
       const combo = { blade: clip(r[0], MAX_PART), ratchet: clip(r[1], MAX_PART), bit: clip(r[2], MAX_PART) };
+      if (r[4] && typeof r[4] === "object") {
+        combo.blade = "";
+        combo.cx = true;
+        for (const [k] of CX_KEYS) combo[k] = clip(r[4][CX_SHORT[k]], MAX_PART);
+        return combo;
+      }
       if (r[3]) combo.mode = clip(r[3], 20);
       return combo;
     });
@@ -226,7 +288,9 @@ function shuffle(arr, rng) {
 
 /**
  * Fill the unlocked combos with random parts from `pool`
- * ({ Blade: [part], Ratchet: [part], Bit: [part] }), honouring the format:
+ * ({ Blade: [part], Ratchet: [part], Bit: [part], "Main Blade": [part], ... }),
+ * honouring the format. A CX-build slot stays a CX build when the pool has
+ * the parts for one (Over Blade added half the time), else gets a whole blade:
  * no repeats, the role rules, and the budget when one is set. `locked[i]`
  * keeps combo i as-is. Tries a few hundred times; returns null if the pool
  * can't satisfy the format.
@@ -238,17 +302,18 @@ export function randomizeDeck(deck, pool, { locked = [], budget = null, rng = Ma
   const lookup = (type, name) => (pool[type] || []).find((p) => norm(p.name) === norm(name)) || null;
 
   for (let t = 0; t < tries; t++) {
-    const used = { Blade: new Set(), Ratchet: new Set(), Bit: new Set() };
+    const used = {};
+    const usedOf = (type) => (used[type] ||= new Set());
     base.forEach((c, i) => {
       if (!locked[i]) return;
-      for (const [k, type] of PART_KEYS) if (c[k]) used[type].add(norm(c[k]));
+      for (const [k, type] of comboKeys(c)) if (c[k]) usedOf(type).add(norm(c[k]));
     });
 
     // roles each unlocked slot must take, for the role-based formats
     const free = base.map((_, i) => i).filter((i) => !locked[i]);
     const slotRole = {};
     if (f.rule === "dab" || f.rule === "bad") {
-      const taken = base.filter((_, i) => locked[i]).map((c) => lookup("Blade", c.blade)?.role);
+      const taken = base.filter((_, i) => locked[i]).map((c) => lookup(...bladePart(c))?.role);
       const need = shuffle(BAD_ROLES.filter((r) => !taken.includes(r)), rng);
       free.forEach((i, n) => { if (need[n]) slotRole[i] = need[n]; });
     }
@@ -256,17 +321,27 @@ export function randomizeDeck(deck, pool, { locked = [], budget = null, rng = Ma
     const out = base.map((c, i) => {
       if (locked[i]) return c;
       const role = slotRole[i];
-      const choose = (type, wantRole) => {
-        let opts = (pool[type] || []).filter((p) => !used[type].has(norm(p.name)));
-        if (f.rule === "all-attack" && type !== "Ratchet") opts = opts.filter((p) => p.role === "Attack");
-        else if (wantRole && type !== "Ratchet") opts = opts.filter((p) => p.role === wantRole);
+      // `roled`: this part's role counts for the format (blade / main blade / bit)
+      const choose = (type, wantRole, roled = true) => {
+        let opts = (pool[type] || []).filter((p) => !usedOf(type).has(norm(p.name)));
+        if (roled && f.rule === "all-attack") opts = opts.filter((p) => p.role === "Attack");
+        else if (roled && wantRole) opts = opts.filter((p) => p.role === wantRole);
         if (!opts.length) return null;
         const p = pick(opts, rng);
-        used[type].add(norm(p.name));
+        usedOf(type).add(norm(p.name));
         return p.name;
       };
+      const canCx = CX_KEYS.every(([k, type]) => CX_OPTIONAL.includes(k) || (pool[type] || []).length);
+      if (isCx(c) && canCx) {
+        const lockChip = choose("Lock Chip", null, false) || "";
+        const mainBlade = choose("Main Blade", role) || "";
+        const overBlade = (pool["Over Blade"] || []).length && rng() < 0.5 ? choose("Over Blade", null, false) || "" : "";
+        const assistBlade = choose("Assist Blade", null, false) || "";
+        return { blade: "", ratchet: choose("Ratchet", null, false) || "", bit: choose("Bit", role) || "",
+          cx: true, lockChip, mainBlade, overBlade, assistBlade };
+      }
       const blade = choose("Blade", role);
-      const ratchet = blade && lookup("Blade", blade)?.ratchetIntegrated ? "" : choose("Ratchet");
+      const ratchet = blade && lookup("Blade", blade)?.ratchetIntegrated ? "" : choose("Ratchet", null, false);
       const bit = choose("Bit", role);
       const modes = (blade && lookup("Blade", blade)?.modes) || [];
       const out = { blade: blade || "", ratchet: ratchet || "", bit: bit || "" };

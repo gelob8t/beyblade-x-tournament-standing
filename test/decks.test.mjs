@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   FORMATS, formatOf, validateDeck, comboStats, deckPoints,
   encodeDeck, decodeDeck, randomizeDeck, ratchetIntegrated, comboMode,
+  isCx, comboKeys, cleanCombo, comboComplete,
 } from "../js/decks.js";
 
 const PARTS = {
@@ -32,7 +33,17 @@ const PARTS = {
     { name: "Ball", role: "Stamina", points: 2 },
     { name: "Rush", role: "Attack", points: 2 },
   ],
+  "Lock Chip": [{ name: "Dran", points: 1 }, { name: "Pegasus", points: 1 }, { name: "Knight", points: 1 }],
+  "Main Blade": [
+    { name: "Brave", role: "Attack", points: 3, stats: { atk: 40, def: 10 } },
+    { name: "Arc", role: "Defense", points: 2 },
+    { name: "Wheel", role: "Balance", points: 2 },
+  ],
+  "Over Blade": [{ name: "Break", points: 1, stats: { atk: 5 } }],
+  "Assist Blade": [{ name: "Slash", points: 1, stats: { atk: 5, def: 5 } }, { name: "Round", points: 1 }, { name: "Heavy", points: 1 }],
 };
+const cx = (lockChip, mainBlade, assistBlade, ratchet, bit, overBlade = "") =>
+  ({ blade: "", ratchet, bit, cx: true, lockChip, mainBlade, overBlade, assistBlade });
 const lookup = (type, name) => PARTS[type].find((p) => p.name.toLowerCase() === String(name).toLowerCase()) || null;
 const deck = (format, ...rows) => ({ name: "t", format, combos: rows.map(([blade, ratchet, bit]) => ({ blade, ratchet, bit })) });
 
@@ -192,4 +203,82 @@ test("randomizeDeck picks a mode for a blade with modes", () => {
   const seen = new Set();
   for (let i = 1; i < 30; i++) seen.add(randomizeDeck({ format: "standard", combos: [{}] }, pool, { rng: seeded(i) }).combos[0].mode);
   assert.deepEqual([...seen].sort(), ["Low", "Normal"]);
+});
+
+// ---- CX builds (Lock Chip + Main Blade + optional Over Blade + Assist Blade)
+
+test("isCx / comboKeys: a CX build uses the blade-part slots", () => {
+  assert.equal(isCx({ blade: "Dran Sword" }), false);
+  assert.equal(isCx({ cx: true }), true);
+  assert.equal(isCx({ mainBlade: "Brave" }), true);
+  assert.deepEqual(comboKeys({ cx: true }).map(([k]) => k), ["lockChip", "mainBlade", "overBlade", "assistBlade", "ratchet", "bit"]);
+  assert.deepEqual(comboKeys({ blade: "x" }).map(([k]) => k), ["blade", "ratchet", "bit"]);
+});
+
+test("CX build: complete without an Over Blade, incomplete without an Assist Blade", () => {
+  assert.equal(comboComplete(cx("Dran", "Brave", "Slash", "3-60", "Flat"), lookup), true);
+  assert.equal(comboComplete(cx("Dran", "Brave", "", "3-60", "Flat"), lookup), false);
+  const d = { name: "t", format: "standard", combos: [cx("Dran", "Brave", "", "3-60", "Flat")] };
+  assert.match(validateDeck(d, lookup).errors.join(" "), /missing a part/);
+});
+
+test("CX build: stats and points add every part, Over Blade included", () => {
+  const c = cx("Dran", "Brave", "Slash", "3-60", "Flat", "Break");
+  assert.deepEqual(comboStats(c, lookup), { atk: 40 + 5 + 5 + 30, def: 10 + 5 + 5, sta: 0, xd: 40, br: 0 });
+  assert.equal(deckPoints([c], lookup).total, 1 + 3 + 1 + 1 + 2 + 3);
+});
+
+test("CX build: the Main Blade sets the blade role for B.A.D / D.A.B / All Attack", () => {
+  const dab = { name: "t", format: "dab", combos: [
+    cx("Dran", "Brave", "Slash", "3-60", "Flat"),
+    cx("Knight", "Arc", "Round", "4-60", "Needle"),
+    { blade: "Hells Scythe", ratchet: "5-60", bit: "Orb" },
+  ] };
+  assert.equal(validateDeck(dab, lookup).ok, true);
+  const aa = { name: "t", format: "all-attack", combos: [cx("Dran", "Arc", "Slash", "3-60", "Flat")] };
+  assert.match(validateDeck(aa, lookup).errors.join(" "), /Arc is a Defense main blade/);
+});
+
+test("CX build: repeated lock chips / main blades across the deck are flagged", () => {
+  const d = { name: "t", format: "standard", combos: [
+    cx("Dran", "Brave", "Slash", "3-60", "Flat"),
+    cx("Dran", "Arc", "Round", "4-60", "Needle"),
+  ] };
+  const r = validateDeck(d, lookup);
+  assert.ok(r.dupes.has("Lock Chip|dran"));
+  assert.match(r.errors.join(" "), /Repeated part: Dran/);
+});
+
+test("CX build: no blade mode or built-in ratchet", () => {
+  const c = { ...cx("Dran", "Brave", "Slash", "", "Flat"), blade: "Hells Nether", mode: "Low" };
+  assert.equal(ratchetIntegrated(c, lookup), false);
+  assert.equal(comboMode(c, lookup), "");
+});
+
+test("cleanCombo keeps only the fields the combo's kind uses", () => {
+  assert.deepEqual(cleanCombo({ blade: " Dran Sword ", ratchet: "3-60", bit: "Flat", lockChip: "" }),
+    { blade: "Dran Sword", ratchet: "3-60", bit: "Flat" });
+  assert.deepEqual(cleanCombo({ blade: "Old", mode: "Low", cx: true, mainBlade: "Brave", ratchet: "3-60", bit: "Flat" }),
+    { blade: "", ratchet: "3-60", bit: "Flat", cx: true, lockChip: "", mainBlade: "Brave", overBlade: "", assistBlade: "" });
+});
+
+test("share links round-trip CX builds next to whole blades", () => {
+  const d = { name: "mix", format: "standard", combos: [
+    cx("Dran", "Brave", "Slash", "3-60", "Flat", "Break"),
+    { blade: "Knight Shield", ratchet: "4-60", bit: "Needle" },
+  ] };
+  assert.deepEqual(decodeDeck(encodeDeck(d)), d);
+});
+
+test("randomizeDeck keeps a CX slot a CX build when the pool has the parts", () => {
+  const d = randomizeDeck({ name: "", format: "bad", combos: [{ cx: true }, {}, { cx: true }] }, PARTS, { rng: seeded(3) });
+  assert.ok(d);
+  assert.equal(isCx(d.combos[0]), true);
+  assert.equal(isCx(d.combos[1]), false);
+  assert.ok(d.combos[0].lockChip && d.combos[0].mainBlade && d.combos[0].assistBlade);
+  assert.equal(validateDeck(d, lookup).ok, true);
+  // no CX parts in the pool: falls back to a whole blade
+  const noCx = randomizeDeck({ name: "", format: "standard", combos: [{ cx: true }] },
+    { Blade: PARTS.Blade, Ratchet: PARTS.Ratchet, Bit: PARTS.Bit }, { rng: seeded(3) });
+  assert.equal(isCx(noCx.combos[0]), false);
 });
