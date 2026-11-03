@@ -5,7 +5,7 @@
   "imageBase": "./assets/parts/",
   "imageExt": ".webp",
   "imageVersion": "2",
-  "cxNote": "CX blades can be built from parts: a Lock Chip + Main Blade + Assist Blade, plus an optional Over Blade (lockChips / mainBlades / overBlades / assistBlades below, same fields as blades). Some CX blades use a one-piece Metal Blade instead (metalBlades, e.g. Bahamut + Blitz). Their photo files are prefixed by type, e.g. lock-chip-dran.webp, main-blade-brave.webp (run npm run parts:slugs). A combo built from parts takes its blade role from the Main Blade.",
+  "cxNote": "CX blades can be built from parts: a Lock Chip + Main Blade + Assist Blade, plus an optional Over Blade (lockChips / mainBlades / overBlades / assistBlades below, same fields as blades). Some CX blades use a one-piece Metal Blade instead (metalBlades, e.g. Bahamut + Blitz). Their photo files are prefixed by type, e.g. lock-chip-dran.webp, main-blade-brave.webp (run npm run parts:slugs). A combo built from parts takes its blade role from the Main Blade, or from the Metal Blade, which takes the Main Blade's place (Lock Chip + Metal Blade + Over Blade + Assist Blade).",
   "roleColors": {
     "Attack": "#ff6a3d",
     "Stamina": "#37c6e8",

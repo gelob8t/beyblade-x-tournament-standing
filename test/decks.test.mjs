@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   FORMATS, formatOf, validateDeck, comboStats, deckPoints,
   encodeDeck, decodeDeck, randomizeDeck, ratchetIntegrated, comboMode,
-  isCx, comboKeys, cleanCombo, comboComplete,
+  isCx, isMetal, comboKeys, cleanCombo, comboComplete,
 } from "../js/decks.js";
 
 const PARTS = {
@@ -40,6 +40,7 @@ const PARTS = {
     { name: "Wheel", role: "Balance", points: 2 },
   ],
   "Over Blade": [{ name: "Break", points: 1, stats: { atk: 5 } }],
+  "Metal Blade": [{ name: "Blitz", role: "Attack", points: 4, stats: { atk: 60 } }, { name: "Fortress", role: "Defense", points: 3 }],
   "Assist Blade": [{ name: "Slash", points: 1, stats: { atk: 5, def: 5 } }, { name: "Round", points: 1 }, { name: "Heavy", points: 1 }],
 };
 const cx = (lockChip, mainBlade, assistBlade, ratchet, bit, overBlade = "") =>
@@ -281,4 +282,35 @@ test("randomizeDeck keeps a CX slot a CX build when the pool has the parts", () 
   const noCx = randomizeDeck({ name: "", format: "standard", combos: [{ cx: true }] },
     { Blade: PARTS.Blade, Ratchet: PARTS.Ratchet, Bit: PARTS.Bit }, { rng: seeded(3) });
   assert.equal(isCx(noCx.combos[0]), false);
+});
+
+// ---- Metal Blade builds (Lock Chip + Metal Blade + Over Blade? + Assist Blade)
+const metal = (lockChip, metalBlade, assistBlade, ratchet, bit, overBlade = "") =>
+  ({ blade: "", ratchet, bit, cx: true, metal: true, lockChip, metalBlade, overBlade, assistBlade });
+
+test("Metal Blade build: the Metal Blade takes the Main Blade's slot and role", () => {
+  const c = metal("Bahamut", "Blitz", "Slash", "3-60", "Flat");
+  assert.equal(isMetal(c), true);
+  assert.deepEqual(comboKeys(c).map(([k]) => k), ["lockChip", "metalBlade", "overBlade", "assistBlade", "ratchet", "bit"]);
+  assert.equal(comboComplete(c, lookup), true);
+  assert.equal(comboComplete({ ...c, assistBlade: "" }, lookup), false);
+  assert.deepEqual(comboStats(c, lookup), { atk: 60 + 5 + 30, def: 5 + 5, sta: 0, xd: 40, br: 0 });
+  const aa = { name: "t", format: "all-attack", combos: [metal("Dran", "Fortress", "Slash", "3-60", "Flat")] };
+  assert.match(validateDeck(aa, lookup).errors.join(" "), /Fortress is a Defense metal blade/);
+});
+
+test("Metal Blade build: share links and cleanCombo keep it a Metal build, even when empty", () => {
+  const d = { name: "m", format: "standard", combos: [metal("Bahamut", "Blitz", "Slash", "3-60", "Flat", "Break"), metal("", "", "", "", "")] };
+  assert.deepEqual(decodeDeck(encodeDeck(d)), d);
+  assert.deepEqual(cleanCombo({ cx: true, metal: true, mainBlade: "stale", metalBlade: "Blitz" }),
+    { blade: "", ratchet: "", bit: "", cx: true, metal: true, lockChip: "", metalBlade: "Blitz", overBlade: "", assistBlade: "" });
+});
+
+test("randomizeDeck keeps a Metal Blade slot a Metal build", () => {
+  const d = randomizeDeck({ name: "", format: "standard", combos: [{ cx: true, metal: true }, { cx: true }] }, PARTS, { rng: seeded(5) });
+  assert.ok(d);
+  assert.equal(isMetal(d.combos[0]), true);
+  assert.ok(d.combos[0].metalBlade && !d.combos[0].mainBlade);
+  assert.equal(isMetal(d.combos[1]), false);
+  assert.ok(d.combos[1].mainBlade);
 });

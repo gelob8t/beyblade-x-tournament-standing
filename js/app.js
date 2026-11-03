@@ -2740,9 +2740,14 @@ function deckCheck(d) {
 }
 
 function deckBladeLabel(c) {
-  if (decks.isCx(c)) return decks.CX_KEYS.map(([k]) => c[k]).filter(Boolean).join(" ");
+  if (decks.isCx(c)) return decks.cxKeys(c).map(([k]) => c[k]).filter(Boolean).join(" ");
   const mode = decks.comboMode(c, catalogPart);
   return c.blade && mode ? `${c.blade} (${mode})` : c.blade || "";
+}
+
+/** "blade", "cx" (Main Blade build) or "metal" (Metal Blade build). */
+function comboKind(c) {
+  return decks.isMetal(c) ? "metal" : decks.isCx(c) ? "cx" : "blade";
 }
 
 function deckComboLabel(c) {
@@ -2987,9 +2992,8 @@ function renderDeckBuilder(main) {
           <span class="muted small deck-combo-name">${esc(deckComboLabel(c))}</span>
           <button type="button" class="btn btn-ghost btn-sm" data-rand="${i}">Randomize</button>
         </div>
-        <div class="seg deck-kind" role="group" aria-label="Blade kind">
-          <button type="button" class="seg-btn${decks.isCx(c) ? "" : " is-active"}" data-kind="${i}" data-kind-val="blade">Blade</button>
-          <button type="button" class="seg-btn${decks.isCx(c) ? " is-active" : ""}" data-kind="${i}" data-kind-val="cx">CX build</button>
+        <div class="seg deck-kind" role="group" aria-label="Blade kind">${[["blade", "Blade"], ["cx", "CX · Main"], ["metal", "CX · Metal"]].map(([v, label]) =>
+          `<button type="button" class="seg-btn${comboKind(c) === v ? " is-active" : ""}" data-kind="${i}" data-kind-val="${v}">${label}</button>`).join("")}
         </div>
         <div class="deck-slots${decks.isCx(c) ? " is-cx" : ""}">${decks.comboKeys(c).map(([k, type]) => slot(c, i, k, type)).join("")}</div>
         ${modeSwitch(c, i)}
@@ -3045,19 +3049,22 @@ function renderDeckBuilder(main) {
     c.mode = b.dataset.modeVal;
     redraw();
   }));
-  // whole blade <-> CX build (Lock Chip + Main Blade + Over Blade + Assist Blade);
-  // the ratchet and bit carry over
-  $("[data-kind]", main).forEach((b) => b.addEventListener("click", () => {
+  // whole blade <-> CX build (Lock Chip + Main or Metal Blade + Over Blade +
+  // Assist Blade); the ratchet and bit carry over, and so do the shared CX
+  // parts when switching between Main and Metal
+  $$("[data-kind]", main).forEach((b) => b.addEventListener("click", () => {
     const i = Number(b.dataset.kind);
     const c = d.combos[i];
-    const toCx = b.dataset.kindVal === "cx";
-    if (toCx === decks.isCx(c)) return;
-    d.combos[i] = toCx
-      ? { blade: "", ratchet: c.ratchet || "", bit: c.bit || "", cx: true, lockChip: "", mainBlade: "", overBlade: "", assistBlade: "" }
-      : { blade: "", ratchet: c.ratchet || "", bit: c.bit || "" };
+    const to = b.dataset.kindVal;
+    if (to === comboKind(c)) return;
+    const keep = { blade: "", ratchet: c.ratchet || "", bit: c.bit || "" };
+    const shared = { lockChip: c.lockChip || "", overBlade: c.overBlade || "", assistBlade: c.assistBlade || "" };
+    d.combos[i] = to === "blade" ? keep
+      : to === "metal" ? { ...keep, cx: true, metal: true, ...shared, metalBlade: "" }
+      : { ...keep, cx: true, ...shared, mainBlade: "" };
     redraw();
   }));
-  $("[data-slot]", main).forEach((b) => b.addEventListener("click", () => {
+  $$("[data-slot]", main).forEach((b) => b.addEventListener("click", () => {
     const [i, k] = b.dataset.slot.split("|");
     openPartPicker(Number(i), k);
   }));

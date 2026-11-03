@@ -6,7 +6,9 @@
 // `mode` only matters for a blade with modes (e.g. Hells Nether Normal/Low).
 // A CX build swaps the whole blade for its parts:
 //   { cx: true, lockChip, mainBlade, overBlade?, assistBlade, ratchet, bit }
-// and takes its blade role from the Main Blade.
+// or, with a one-piece Metal Blade in the Main Blade's place:
+//   { cx: true, metal: true, lockChip, metalBlade, overBlade?, assistBlade, ratchet, bit }
+// and takes its blade role from the Main / Metal Blade.
 // `lookup(type, name)` returns the catalog part ({ role, points, stats }) or
 // null for a part that isn't in the catalog.
 
@@ -14,20 +16,32 @@ export const PART_KEYS = [["blade", "Blade"], ["ratchet", "Ratchet"], ["bit", "B
 
 // the blade parts of a CX build, in display order; the Over Blade is optional
 export const CX_KEYS = [["lockChip", "Lock Chip"], ["mainBlade", "Main Blade"], ["overBlade", "Over Blade"], ["assistBlade", "Assist Blade"]];
+export const CX_METAL_KEYS = [["lockChip", "Lock Chip"], ["metalBlade", "Metal Blade"], ["overBlade", "Over Blade"], ["assistBlade", "Assist Blade"]];
 export const CX_OPTIONAL = ["overBlade"];
 
 /** True when the combo is a CX build (blade made from parts). */
 export function isCx(combo) {
-  return !!(combo && (combo.cx || CX_KEYS.some(([k]) => combo[k])));
+  return !!(combo && (combo.cx || combo.metalBlade || CX_KEYS.some(([k]) => combo[k])));
+}
+
+/** True when the CX build uses a Metal Blade instead of a Main Blade. */
+export function isMetal(combo) {
+  return isCx(combo) && !!(combo.metal || combo.metalBlade);
+}
+
+/** The blade-part slots of a CX build (Main or Metal Blade). */
+export function cxKeys(combo) {
+  return isMetal(combo) ? CX_METAL_KEYS : CX_KEYS;
 }
 
 /** The [key, type] slots a combo uses: a whole blade, or the CX blade parts. */
 export function comboKeys(combo) {
-  return isCx(combo) ? [...CX_KEYS, ["ratchet", "Ratchet"], ["bit", "Bit"]] : PART_KEYS;
+  return isCx(combo) ? [...cxKeys(combo), ["ratchet", "Ratchet"], ["bit", "Bit"]] : PART_KEYS;
 }
 
 /** [type, name] of the part that sets the combo's blade role. */
 export function bladePart(combo) {
+  if (isMetal(combo)) return ["Metal Blade", combo.metalBlade || ""];
   return isCx(combo) ? ["Main Blade", combo.mainBlade || ""] : ["Blade", (combo && combo.blade) || ""];
 }
 
@@ -36,8 +50,8 @@ export function cleanCombo(c, mode) {
   c = c || {};
   const s = (v) => String(v || "").trim();
   if (isCx(c)) {
-    const out = { blade: "", ratchet: s(c.ratchet), bit: s(c.bit), cx: true };
-    for (const [k] of CX_KEYS) out[k] = s(c[k]);
+    const out = { blade: "", ratchet: s(c.ratchet), bit: s(c.bit), cx: true, ...(isMetal(c) ? { metal: true } : {}) };
+    for (const [k] of cxKeys(c)) out[k] = s(c[k]);
     return out;
   }
   const m = mode === undefined ? c.mode : mode;
@@ -47,7 +61,7 @@ export function cleanCombo(c, mode) {
 /** Is every required slot of the combo filled? */
 export function comboComplete(c, lookup) {
   if (!c || !c.bit) return false;
-  if (isCx(c)) return !!c.ratchet && CX_KEYS.every(([k]) => CX_OPTIONAL.includes(k) || c[k]);
+  if (isCx(c)) return !!c.ratchet && cxKeys(c).every(([k]) => CX_OPTIONAL.includes(k) || c[k]);
   return !!(c.blade && (c.ratchet || ratchetIntegrated(c, lookup)));
 }
 
@@ -214,11 +228,12 @@ export function validateDeck(deck, lookup, { budget = null } = {}) {
 // The deck goes in the URL as base64url(JSON) of a compact shape:
 //   { n: name, f: format, c: [[blade, ratchet, bit, mode?], ...] }
 // A CX build's row is ["", ratchet, bit, "", { l, m, o?, a }] (lock chip,
-// main, over and assist blade), so older links still decode the same.
+// main, over and assist blade; a Metal Blade build has x in place of m),
+// so older links still decode the same.
 
 const MAX_NAME = 60;
 const MAX_PART = 40;
-const CX_SHORT = { lockChip: "l", mainBlade: "m", overBlade: "o", assistBlade: "a" };
+const CX_SHORT = { lockChip: "l", mainBlade: "m", metalBlade: "x", overBlade: "o", assistBlade: "a" };
 
 function b64urlEncode(str) {
   const bytes = new TextEncoder().encode(str);
@@ -239,8 +254,8 @@ export function encodeDeck(deck) {
     f: formatOf(deck.format).key,
     c: (deck.combos || []).slice(0, MAX_BEYS).map((c) => {
       if (isCx(c)) {
-        const parts = {};
-        for (const [k] of CX_KEYS) if (c[k]) parts[CX_SHORT[k]] = c[k];
+        const parts = isMetal(c) ? { x: c.metalBlade || "" } : {};
+        for (const [k] of cxKeys(c)) if (c[k]) parts[CX_SHORT[k]] = c[k];
         return ["", c.ratchet || "", c.bit || "", "", parts];
       }
       return c.mode ? [c.blade || "", c.ratchet || "", c.bit || "", c.mode] : [c.blade || "", c.ratchet || "", c.bit || ""];
@@ -261,7 +276,8 @@ export function decodeDeck(s) {
       if (r[4] && typeof r[4] === "object") {
         combo.blade = "";
         combo.cx = true;
-        for (const [k] of CX_KEYS) combo[k] = clip(r[4][CX_SHORT[k]], MAX_PART);
+        if ("x" in r[4]) combo.metal = true;
+        for (const [k] of cxKeys(combo)) combo[k] = clip(r[4][CX_SHORT[k]], MAX_PART);
         return combo;
       }
       if (r[3]) combo.mode = clip(r[3], 20);
@@ -289,8 +305,9 @@ function shuffle(arr, rng) {
 /**
  * Fill the unlocked combos with random parts from `pool`
  * ({ Blade: [part], Ratchet: [part], Bit: [part], "Main Blade": [part], ... }),
- * honouring the format. A CX-build slot stays a CX build when the pool has
- * the parts for one (Over Blade added half the time), else gets a whole blade:
+ * honouring the format. A CX-build slot stays a CX build of the same kind
+ * (Main or Metal Blade) when the pool has the parts for one (Over Blade added
+ * half the time), else gets a whole blade:
  * no repeats, the role rules, and the budget when one is set. `locked[i]`
  * keeps combo i as-is. Tries a few hundred times; returns null if the pool
  * can't satisfy the format.
@@ -331,14 +348,15 @@ export function randomizeDeck(deck, pool, { locked = [], budget = null, rng = Ma
         usedOf(type).add(norm(p.name));
         return p.name;
       };
-      const canCx = CX_KEYS.every(([k, type]) => CX_OPTIONAL.includes(k) || (pool[type] || []).length);
-      if (isCx(c) && canCx) {
+      const canCx = isCx(c) && cxKeys(c).every(([k, type]) => CX_OPTIONAL.includes(k) || (pool[type] || []).length);
+      if (canCx) {
+        const [coreKey, coreType] = cxKeys(c)[1];
         const lockChip = choose("Lock Chip", null, false) || "";
-        const mainBlade = choose("Main Blade", role) || "";
+        const core = choose(coreType, role) || "";
         const overBlade = (pool["Over Blade"] || []).length && rng() < 0.5 ? choose("Over Blade", null, false) || "" : "";
         const assistBlade = choose("Assist Blade", null, false) || "";
         return { blade: "", ratchet: choose("Ratchet", null, false) || "", bit: choose("Bit", role) || "",
-          cx: true, lockChip, mainBlade, overBlade, assistBlade };
+          cx: true, ...(isMetal(c) ? { metal: true } : {}), lockChip, [coreKey]: core, overBlade, assistBlade };
       }
       const blade = choose("Blade", role);
       const ratchet = blade && lookup("Blade", blade)?.ratchetIntegrated ? "" : choose("Ratchet", null, false);
