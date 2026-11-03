@@ -99,19 +99,19 @@
     { "name": "Croco", "role": "Defense" }
   ],
   "mainBlades": [
-    { "name": "Brave", "role": "" },
-    { "name": "Arc", "role": "" },
-    { "name": "Dark", "role": "" },
-    { "name": "Reaper", "role": "" },
-    { "name": "Brush", "role": "" },
-    { "name": "Blast", "role": "" },
-    { "name": "Flame", "role": "" },
-    { "name": "Eclipse", "role": "" },
-    { "name": "Hunt", "role": "" },
-    { "name": "Might", "role": "" },
-    { "name": "Flare", "role": "" },
-    { "name": "Volt", "role": "" },
-    { "name": "Fang", "role": "" }
+    { "name": "Brave", "role": "Attack" },
+    { "name": "Arc", "role": "Stamina" },
+    { "name": "Dark", "role": "Defense" },
+    { "name": "Reaper", "role": "Balance" },
+    { "name": "Brush", "role": "Attack" },
+    { "name": "Blast", "role": "Attack" },
+    { "name": "Flame", "role": "Stamina" },
+    { "name": "Eclipse", "role": "Balance" },
+    { "name": "Hunt", "role": "Stamina" },
+    { "name": "Might", "role": "Balance" },
+    { "name": "Flare", "role": "Defense" },
+    { "name": "Volt", "role": "Attack" },
+    { "name": "Fang", "role": "Attack" }
   ],
   "overBlades": [
     { "name": "Break", "role": "" },

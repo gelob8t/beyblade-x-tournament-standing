@@ -89,19 +89,19 @@
     "Croco": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null }
   },
   "Main Blade": {
-    "Brave": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Arc": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Dark": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Reaper": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Brush": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Blast": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Flame": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Eclipse": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Hunt": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Might": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Flare": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Volt": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Fang": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null }
+    "Brave": { "points": null, "atk": 40, "def": 10, "sta": 10, "xd": null, "br": null },
+    "Arc": { "points": null, "atk": 10, "def": 10, "sta": 40, "xd": null, "br": null },
+    "Dark": { "points": null, "atk": 10, "def": 40, "sta": 10, "xd": null, "br": null },
+    "Reaper": { "points": null, "atk": 40, "def": 20, "sta": 40, "xd": null, "br": null },
+    "Brush": { "points": null, "atk": 60, "def": 30, "sta": 10, "xd": null, "br": null },
+    "Blast": { "points": null, "atk": 50, "def": 10, "sta": 15, "xd": null, "br": null },
+    "Flame": { "points": null, "atk": 5, "def": 15, "sta": 40, "xd": null, "br": null },
+    "Eclipse": { "points": null, "atk": 30, "def": 30, "sta": 30, "xd": null, "br": null },
+    "Hunt": { "points": null, "atk": 20, "def": 10, "sta": 30, "xd": null, "br": null },
+    "Might": { "points": null, "atk": 25, "def": 25, "sta": 25, "xd": null, "br": null },
+    "Flare": { "points": null, "atk": 25, "def": 40, "sta": 10, "xd": null, "br": null },
+    "Volt": { "points": null, "atk": 40, "def": 10, "sta": 10, "xd": null, "br": null },
+    "Fang": { "points": null, "atk": 35, "def": 10, "sta": 15, "xd": null, "br": null }
   },
   "Over Blade": {
     "Break": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
