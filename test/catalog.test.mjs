@@ -99,5 +99,5 @@ test("queryCatalog: CX part types sort between blades and ratchets", () => {
     { type: "Lock Chip", name: "Dran" }, { type: "Main Blade", name: "Brave" }, { type: "Blade", name: "Dran Sword" },
   ], {});
   assert.deepEqual(out.map((p) => p.type), ["Blade", "Lock Chip", "Main Blade", "Assist Blade", "Ratchet", "Bit"]);
-  assert.deepEqual(PART_TYPES, ["Blade", "Lock Chip", "Main Blade", "Over Blade", "Assist Blade", "Ratchet", "Bit"]);
+  assert.deepEqual(PART_TYPES, ["Blade", "Lock Chip", "Main Blade", "Over Blade", "Assist Blade", "Metal Blade", "Ratchet", "Bit"]);
 });

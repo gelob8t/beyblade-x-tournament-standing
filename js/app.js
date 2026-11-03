@@ -2574,7 +2574,7 @@ function partSvg(part, size = 40) {
   } else if (part.type === "Lock Chip") {
     inner = `<circle cx="20" cy="20" r="11" fill="#141b28" stroke="${col}" stroke-width="2.4"/>
       <path d="M15.5 20 L20 14.5 L24.5 20 L20 25.5 Z" fill="${col}"/>`;
-  } else if (part.type === "Main Blade" || part.type === "Over Blade") {
+  } else if (part.type === "Main Blade" || part.type === "Over Blade" || part.type === "Metal Blade") {
     // a blade ring with an open centre (the lock chip sits there)
     const cx = 20, cy = 20, n = part.type === "Over Blade" ? 3 : 5, pts = [];
     const R = part.type === "Over Blade" ? 13 : 16, r = part.type === "Over Blade" ? 9 : 10;

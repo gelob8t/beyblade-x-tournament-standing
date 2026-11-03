@@ -13,7 +13,8 @@ const ROLE_COLORS = {
 /**
  * Every part type, in display order: [parts.json list, type, image prefix].
  * CX blades can also be built from parts — Lock Chip + Main Blade +
- * Assist Blade, plus an optional Over Blade. Those types get an image-file
+ * Assist Blade, plus an optional Over Blade — or a one-piece Metal Blade
+ * (e.g. Bahamut + Blitz). Those types get an image-file
  * prefix so e.g. a lock chip and a blade with the same name don't collide.
  */
 export const PART_GROUPS = [
@@ -22,12 +23,13 @@ export const PART_GROUPS = [
   ["mainBlades", "Main Blade", "main-blade-"],
   ["overBlades", "Over Blade", "over-blade-"],
   ["assistBlades", "Assist Blade", "assist-blade-"],
+  ["metalBlades", "Metal Blade", "metal-blade-"],
   ["ratchets", "Ratchet", ""],
   ["bits", "Bit", ""],
 ];
 export const PART_TYPES = PART_GROUPS.map(([, type]) => type);
 /** Types that carry an Attack/Stamina/Defense/Balance role. */
-export const ROLE_TYPES = ["Blade", "Main Blade", "Over Blade", "Assist Blade", "Bit"];
+export const ROLE_TYPES = ["Blade", "Main Blade", "Over Blade", "Assist Blade", "Metal Blade", "Bit"];
 
 /** Image file name (without extension) the app looks for, e.g. "lock-chip-dran". */
 export function imageSlug(type, name) {
