@@ -114,13 +114,13 @@
     { "name": "Fang", "role": "Attack" }
   ],
   "overBlades": [
-    { "name": "Break", "role": "" },
-    { "name": "Guard", "role": "" },
-    { "name": "Flow", "role": "" },
-    { "name": "Peak", "role": "" },
-    { "name": "O", "role": "" },
-    { "name": "Tough", "role": "" },
-    { "name": "Weight", "role": "" }
+    { "name": "Break", "role": "Attack" },
+    { "name": "Guard", "role": "Defense" },
+    { "name": "Flow", "role": "Stamina" },
+    { "name": "Peak", "role": "Attack" },
+    { "name": "Outer", "role": "Stamina" },
+    { "name": "Tough", "role": "Defense" },
+    { "name": "Weight", "role": "Balance" }
   ],
   "assistBlades": [
     { "name": "Slash", "role": "" },

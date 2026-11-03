@@ -104,13 +104,13 @@
     "Fang": { "points": null, "atk": 35, "def": 10, "sta": 15, "xd": null, "br": null }
   },
   "Over Blade": {
-    "Break": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Guard": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Flow": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Peak": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "O": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Tough": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
-    "Weight": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null }
+    "Break": { "points": null, "atk": 8, "def": 6, "sta": 6, "xd": null, "br": null },
+    "Guard": { "points": null, "atk": 5, "def": 8, "sta": 6, "xd": null, "br": null },
+    "Flow": { "points": null, "atk": 6, "def": 6, "sta": 8, "xd": null, "br": null },
+    "Peak": { "points": null, "atk": 8, "def": 7, "sta": 5, "xd": null, "br": null },
+    "Outer": { "points": null, "atk": 6, "def": 7, "sta": 8, "xd": null, "br": null },
+    "Tough": { "points": null, "atk": 5, "def": 9, "sta": 5, "xd": null, "br": null },
+    "Weight": { "points": null, "atk": 7, "def": 7, "sta": 7, "xd": null, "br": null }
   },
   "Assist Blade": {
     "Slash": { "points": null, "atk": null, "def": null, "sta": null, "xd": null, "br": null },
