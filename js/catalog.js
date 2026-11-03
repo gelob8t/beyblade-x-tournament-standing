@@ -29,7 +29,7 @@ export const PART_GROUPS = [
 ];
 export const PART_TYPES = PART_GROUPS.map(([, type]) => type);
 /** Types that carry an Attack/Stamina/Defense/Balance role. */
-export const ROLE_TYPES = ["Blade", "Main Blade", "Over Blade", "Assist Blade", "Metal Blade", "Bit"];
+export const ROLE_TYPES = ["Blade", "Lock Chip", "Main Blade", "Over Blade", "Assist Blade", "Metal Blade", "Bit"];
 
 /** Image file name (without extension) the app looks for, e.g. "lock-chip-dran". */
 export function imageSlug(type, name) {
